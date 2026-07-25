@@ -13,13 +13,14 @@ app.listen(PORT, () => {
   console.log(`Web server is running on port ${PORT}`);
 });
 
-// Discord Bot setup with full necessary intents
+// Discord Bot setup with full necessary intents (Including DirectMessages)
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.GuildMembers,
-    GatewayIntentBits.MessageContent
+    GatewayIntentBits.MessageContent,
+    GatewayIntentBits.DirectMessages
   ]
 });
 
@@ -124,6 +125,31 @@ client.on('guildMemberAdd', async member => {
     .setTimestamp();
 
   await welcomeChannel.send({ embeds: [welcomeEmbed] });
+});
+
+// DM Reply Listener: Forwards messages sent to the bot's DMs into a specific channel
+client.on('messageCreate', async message => {
+  // Ignore messages sent by the bot itself or messages sent in regular servers (only look at DMs)
+  if (message.author.bot) return;
+  if (message.guild) return; 
+
+  // Replace with the ID of the channel where you want the reply notification to show up
+  const logChannelId = 'YOUR_LOG_CHANNEL_ID_HERE'; 
+  const logChannel = client.channels.cache.get(logChannelId);
+  
+  if (!logChannel) return;
+
+  const replyEmbed = new EmbedBuilder()
+    .setColor('#f1c40f')
+    .setTitle(`📩 New DM Reply from ${message.author.tag}`)
+    .setDescription(message.content || '[Attached an image/embed]')
+    .addFields(
+      { name: 'User ID', value: message.author.id, inline: true }
+    )
+    .setThumbnail(message.author.displayAvatarURL({ dynamic: true }))
+    .setTimestamp();
+
+  await logChannel.send({ embeds: [replyEmbed] });
 });
 
 // Handle Slash Command Interactions
@@ -313,7 +339,8 @@ client.on('interactionCreate', async interaction => {
       const embed = new EmbedBuilder()
         .setColor('#7289da')
         .setTitle('Support Portal')
-        .setDescription('👋 **How can we help you today?**\n\nSelect the most relevant category from the menu below to open a ticket.\n\n**Note:** You can only have one active ticket at a time.');
+        .setDescription('👋 **How can we help you today?**\n\nSelect the most relevant category from the menu below to open a ticket.\n\n**Note:** You can only have one active ticket at a time.')
+        .setImage('https://cdn.discordapp.com/attachments/YOUR_IMAGE_LINK_HERE'); // Your banner image link
 
       const row = new ActionRowBuilder().addComponents(
         new StringSelectMenuBuilder()
@@ -384,7 +411,7 @@ client.on('interactionCreate', async interaction => {
 
   } catch (error) {
     console.error('Error creating ticket channel:', error);
-    await interaction.editReply({ content: '❌ Failed to create your ticket channel. Please check bot permissions.' });
+    await interaction.editReply({ content: '❌ Failed to type channel. Please check bot permissions.' });
   }
 });
 
