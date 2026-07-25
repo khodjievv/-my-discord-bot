@@ -129,7 +129,6 @@ client.on('guildMemberAdd', async member => {
 
 // DM Reply Listener: Forwards messages sent to the bot's DMs into a specific channel
 client.on('messageCreate', async message => {
-  // Ignore messages sent by the bot itself or messages sent in regular servers (only look at DMs)
   if (message.author.bot) return;
   if (message.guild) return; 
 
@@ -140,8 +139,8 @@ client.on('messageCreate', async message => {
   if (!logChannel) return;
 
   const replyEmbed = new EmbedBuilder()
-    .setColor('#f1c40f')
-    .setTitle(`📩 New DM Reply from ${message.author.tag}`)
+    .setColor('#5865F2')
+    .setTitle(`📩 ${message.author.tag} Replied`)
     .setDescription(message.content || '[Attached an image/embed]')
     .addFields(
       { name: 'User ID', value: message.author.id, inline: true }
@@ -340,7 +339,7 @@ client.on('interactionCreate', async interaction => {
         .setColor('#7289da')
         .setTitle('Support Portal')
         .setDescription('👋 **How can we help you today?**\n\nSelect the most relevant category from the menu below to open a ticket.\n\n**Note:** You can only have one active ticket at a time.')
-        .setImage('https://cdn.discordapp.com/attachments/YOUR_IMAGE_LINK_HERE'); // Your banner image link
+        .setImage('YOUR_NEW_SOLID_PURPLE_IMAGE_URL_HERE'); // Paste your new solid purple image link here
 
       const row = new ActionRowBuilder().addComponents(
         new StringSelectMenuBuilder()
@@ -411,7 +410,7 @@ client.on('interactionCreate', async interaction => {
 
   } catch (error) {
     console.error('Error creating ticket channel:', error);
-    await interaction.editReply({ content: '❌ Failed to type channel. Please check bot permissions.' });
+    await interaction.editReply({ content: '❌ Failed to create your ticket channel. Please check bot permissions.' });
   }
 });
 
