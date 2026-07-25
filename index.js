@@ -132,7 +132,6 @@ client.on('messageCreate', async message => {
   if (message.author.bot) return;
   if (message.guild) return; 
 
-  // Replace with the ID of the channel where you want the reply notification to show up
   const logChannelId = 'YOUR_LOG_CHANNEL_ID_HERE'; 
   const logChannel = client.channels.cache.get(logChannelId);
   
@@ -338,8 +337,8 @@ client.on('interactionCreate', async interaction => {
       const embed = new EmbedBuilder()
         .setColor('#7289da')
         .setTitle('Support Portal')
-        .setDescription('👋 **How can we help you today?**\n\nSelect the most relevant category from the menu below to open a ticket.\n\n**Note:** You can only have one active ticket at a time.')
-        .setImage('YOUR_NEW_SOLID_PURPLE_IMAGE_URL_HERE'); // Paste your new solid purple image link here
+        .setDescription('👋 **How can we help you today?**\n\nSelect the most relevant category from the menu below to open a ticket.\n\n**Note:** You can only have one active ticket at a time.');
+        // Removed the invalid .setImage() line that caused the error
 
       const row = new ActionRowBuilder().addComponents(
         new StringSelectMenuBuilder()
