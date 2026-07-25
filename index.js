@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
+const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits, ActionRowBuilder, StringSelectMenuBuilder, ChannelType, PermissionsBitField } = require('discord.js');
 const express = require('express');
 
 // Express server for Render
@@ -13,16 +13,17 @@ app.listen(PORT, () => {
   console.log(`Web server is running on port ${PORT}`);
 });
 
-// Discord Bot setup
+// Discord Bot setup (Added GuildMembers intent for the Welcomer system)
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.GuildMembers,
     GatewayIntentBits.MessageContent
   ]
 });
 
-// Define Slash Commands
+// Define Slash Commands (Added ticketpanel command)
 const commands = [
   new SlashCommandBuilder()
     .setName('pong')
@@ -61,7 +62,11 @@ const commands = [
 
   new SlashCommandBuilder()
     .setName('serverinfo')
-    .setDescription('Shows detailed and cool-looking information about the server')
+    .setDescription('Shows detailed and cool-looking information about the server'),
+
+  new SlashCommandBuilder()
+    .setName('ticketpanel')
+    .setDescription('Posts the ticket support portal panel')
 ].map(command => command.toJSON());
 
 client.once('ready', async () => {
@@ -73,16 +78,31 @@ client.once('ready', async () => {
   try {
     console.log('Started refreshing guild (/) commands.');
     
-    // This overwrites all old commands with ONLY the new array list
     await rest.put(
       Routes.applicationGuildCommands(client.user.id, GUILD_ID),
       { body: commands },
     );
     
-    console.log('Successfully reloaded and cleared old guild (/) commands.');
+    console.log('Successfully reloaded and updated guild (/) commands.');
   } catch (error) {
     console.error(error);
   }
+});
+
+// Welcomer System: Greets new members when they join
+client.on('guildMemberAdd', async member => {
+  // Change 'welcome' to the exact name of your welcome text channel
+  const welcomeChannel = member.guild.channels.cache.find(channel => channel.name === 'welcome' && channel.isTextBased());
+  if (!welcomeChannel) return;
+
+  const welcomeEmbed = new EmbedBuilder()
+    .setColor('#7289da')
+    .setTitle('👋 Welcome to the Server!')
+    .setDescription(`Hey ${member}, welcome to **${member.guild.name}**! We are thrilled to have you here. Make sure to check out the rules and enjoy your stay!`)
+    .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
+    .setTimestamp();
+
+  await welcomeChannel.send({ embeds: [welcomeEmbed] });
 });
 
 // Handle Slash Command Interactions
@@ -193,6 +213,81 @@ client.on('interactionCreate', async interaction => {
       .setTimestamp();
 
     await interaction.reply({ embeds: [embed] });
+  }
+
+  // Ticket Panel Command (Posts the dropdown menu and banner image)
+  else if (commandName === 'ticketpanel') {
+    const embed = new EmbedBuilder()
+      .setColor('#7289da')
+      .setTitle('Support Portal')
+      .setDescription('👋 **How can we help you today?**\n\nSelect the most relevant category from the menu below to open a ticket.\n\n**Note:** You can only have one active ticket at a time.')
+      .setImage('YOUR_BANNER_IMAGE_URL_HERE'); // Put your direct banner image link here
+
+    const row = new ActionRowBuilder().addComponents(
+      new StringSelectMenuBuilder()
+        .setCustomId('ticket_category_select')
+        .setPlaceholder('📁 Choose a category...')
+        .addOptions([
+          { label: 'General Inquiry', value: 'general_inquiry', emoji: '🛡️' },
+          { label: 'Player Reporting', value: 'player_reporting', emoji: '⛔' },
+          { label: 'Billing & Ranks', value: 'billing_ranks', emoji: '💰' },
+          { label: 'Bug Report', value: 'bug_report', emoji: '🐛' },
+        ]),
+    );
+
+    await interaction.reply({ embeds: [embed], components: [row] });
+  }
+});
+
+// Handle Ticket Dropdown Selections (Fixes the "This interaction failed" error)
+client.on('interactionCreate', async interaction => {
+  if (!interaction.isStringSelectMenu()) return;
+  if (interaction.customId !== 'ticket_category_select') return;
+
+  await interaction.deferReply({ ephemeral: true });
+
+  const categoryValue = interaction.values[0];
+  const guild = interaction.guild;
+  const member = interaction.member;
+
+  // Prevent users from opening multiple tickets at once
+  const existingChannel = guild.channels.cache.find(c => c.name === `ticket-${member.user.username.toLowerCase()}`);
+  if (existingChannel) {
+    return interaction.editReply({ content: `❌ You already have an active ticket open here: ${existingChannel}` });
+  }
+
+  try {
+    const ticketChannel = await guild.channels.create({
+      name: `ticket-${member.user.username}`,
+      type: ChannelType.GuildText,
+      permissionOverwrites: [
+        {
+          id: guild.id,
+          deny: [PermissionsBitField.Flags.ViewChannel],
+        },
+        {
+          id: member.id,
+          allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory],
+        },
+        {
+          id: client.user.id,
+          allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages],
+        },
+      ],
+    });
+
+    await interaction.editReply({ content: `✅ Your ticket has been created! Head over to ${ticketChannel}` });
+
+    const welcomeEmbed = new EmbedBuilder()
+      .setColor('#7289da')
+      .setTitle(`Ticket: ${categoryValue.replace('_', ' ').toUpperCase()}`)
+      .setDescription(`Hello ${member}, thank you for reaching out.\n\nPlease describe your issue in detail, and a staff member will be with you shortly.`);
+
+    await ticketChannel.send({ content: `${member}`, embeds: [welcomeEmbed] });
+
+  } catch (error) {
+    console.error(error);
+    await interaction.editReply({ content: '❌ Failed to create your ticket channel. Please contact an administrator.' });
   }
 });
 
