@@ -1,7 +1,7 @@
-const { Client, GatewayIntentBits } = require('discord.js');
+const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 const express = require('express');
 
-// Simple Express server to satisfy Render's web service requirement
+// Express server for Render
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -22,13 +22,170 @@ const client = new Client({
   ]
 });
 
-client.once('ready', () => {
+// Define Slash Commands
+const commands = [
+  new SlashCommandBuilder()
+    .setName('pong')
+    .setDescription('Replies with Ping!'),
+
+  new SlashCommandBuilder()
+    .setName('dm')
+    .setDescription('Sends a specific message to your DMs'),
+
+  new SlashCommandBuilder()
+    .setName('ban')
+    .setDescription('Bans a member from the server')
+    .addUserOption(option => option.setName('user').setDescription('The user to ban').setRequired(true))
+    .addStringOption(option => option.setName('reason').setDescription('Reason for ban').setRequired(false)),
+
+  new SlashCommandBuilder()
+    .setName('kick')
+    .setDescription('Kicks a member from the server')
+    .addUserOption(option => option.setName('user').setDescription('The user to kick').setRequired(true))
+    .addStringOption(option => option.setName('reason').setDescription('Reason for kick').setRequired(false)),
+
+  new SlashCommandBuilder()
+    .setName('timeout')
+    .setDescription('Timeouts a member')
+    .addUserOption(option => option.setName('user').setDescription('The user to timeout').setRequired(true))
+    .addIntegerOption(option => option.setName('duration').setDescription('Duration in minutes').setRequired(true))
+    .addStringOption(option => option.setName('reason').setDescription('Reason for timeout').setRequired(false)),
+
+  new SlashCommandBuilder()
+    .setName('announce')
+    .setDescription('Sends an announcement message to a specific channel')
+    .addChannelOption(option => option.setName('channel').setDescription('The channel to send the announcement to').setRequired(true))
+    .addStringOption(option => option.setName('message').setDescription('The announcement message').setRequired(true)),
+
+  new SlashCommandBuilder()
+    .setName('serverinfo')
+    .setDescription('Shows detailed and cool-looking information about the server')
+].map(command => command.toJSON());
+
+client.once('ready', async () => {
   console.log(`Logged in as ${client.user.tag}!`);
+
+  // Register commands instantly to your specific server using your Guild ID
+  const GUILD_ID = '1430150908490027090';
+  const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
+  
+  try {
+    console.log('Started refreshing guild (/) commands.');
+    await rest.put(
+      Routes.applicationGuildCommands(client.user.id, GUILD_ID),
+      { body: commands },
+    );
+    console.log('Successfully reloaded guild (/) commands.');
+  } catch (error) {
+    console.error(error);
+  }
 });
 
-client.on('messageCreate', message => {
-  if (message.content === '!ping') {
-    message.reply('Pong!');
+// Handle Slash Command Interactions
+client.on('interactionCreate', async interaction => {
+  if (!interaction.isChatInputCommand()) return;
+
+  const { commandName } = interaction;
+
+  if (commandName === 'pong') {
+    await interaction.reply('Ping!');
+  } 
+  
+  else if (commandName === 'dm') {
+    try {
+      await interaction.user.send('Hello! Here is your requested specific message from the server.');
+      await interaction.reply({ content: 'I have sent you a message in your DMs!', ephemeral: true });
+    } catch (error) {
+      await interaction.reply({ content: 'I could not send you a DM. Please check if your DMs are open.', ephemeral: true });
+    }
+  } 
+  
+  else if (commandName === 'ban') {
+    if (!interaction.member.permissions.has(PermissionFlagsBits.BanMembers)) {
+      return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
+    }
+    const user = interaction.options.getUser('user');
+    const reason = interaction.options.getString('reason') || 'No reason provided';
+    const member = await interaction.guild.members.fetch(user.id).catch(() => null);
+
+    if (!member) return interaction.reply({ content: 'User not found in this server.', ephemeral: true });
+
+    await member.ban({ reason });
+    await interaction.reply(`Successfully banned **${user.tag}**. Reason: ${reason}`);
+  } 
+  
+  else if (commandName === 'kick') {
+    if (!interaction.member.permissions.has(PermissionFlagsBits.KickMembers)) {
+      return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
+    }
+    const user = interaction.options.getUser('user');
+    const reason = interaction.options.getString('reason') || 'No reason provided';
+    const member = await interaction.guild.members.fetch(user.id).catch(() => null);
+
+    if (!member) return interaction.reply({ content: 'User not found in this server.', ephemeral: true });
+
+    await member.kick(reason);
+    await interaction.reply(`Successfully kicked **${user.tag}**. Reason: ${reason}`);
+  } 
+  
+  else if (commandName === 'timeout') {
+    if (!interaction.member.permissions.has(PermissionFlagsBits.ModerateMembers)) {
+      return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
+    }
+    const user = interaction.options.getUser('user');
+    const duration = interaction.options.getInteger('duration');
+    const reason = interaction.options.getString('reason') || 'No reason provided';
+    const member = await interaction.guild.members.fetch(user.id).catch(() => null);
+
+    if (!member) return interaction.reply({ content: 'User not found in this server.', ephemeral: true });
+
+    const durationMs = duration * 60 * 1000;
+    await member.timeout(durationMs, reason);
+    await interaction.reply(`Successfully timed out **${user.tag}** for ${duration} minutes. Reason: ${reason}`);
+  } 
+  
+  else if (commandName === 'announce') {
+    if (!interaction.member.permissions.has(PermissionFlagsBits.ManageMessages)) {
+      return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
+    }
+    const channel = interaction.options.getChannel('channel');
+    const messageText = interaction.options.getString('message');
+
+    if (!channel.isTextBased()) {
+      return interaction.reply({ content: 'Please select a valid text channel.', ephemeral: true });
+    }
+
+    const embed = new EmbedBuilder()
+      .setColor('#5865F2')
+      .setTitle('📢 Server Announcement')
+      .setDescription(messageText)
+      .setFooter({ text: `Announced by ${interaction.user.tag}` })
+      .setTimestamp();
+
+    await channel.send({ embeds: [embed] });
+    await interaction.reply({ content: `Announcement successfully sent to ${channel}!`, ephemeral: true });
+  } 
+  
+  else if (commandName === 'serverinfo') {
+    const { guild } = interaction;
+    const owner = await guild.fetchOwner();
+
+    const embed = new EmbedBuilder()
+      .setColor('#2b2d31')
+      .setTitle(`🛡️ ${guild.name} Server Information`)
+      .setThumbnail(guild.iconURL({ dynamic: true }))
+      .addFields(
+        { name: '👑 Owner', value: `${owner.user.tag}`, inline: true },
+        { name: '👥 Members', value: `${guild.memberCount}`, inline: true },
+        { name: '🚀 Boosts', value: `${guild.premiumSubscriptionCount || 0} (Level ${guild.premiumTier})`, inline: true },
+        { name: '📅 Created On', value: `<t:${Math.floor(guild.createdTimestamp / 1000)}:R>`, inline: true },
+        { name: '💬 Channels', value: `${guild.channels.cache.size}`, inline: true },
+        { name: '🌍 Verification Level', value: `${guild.verificationLevel}`, inline: true }
+      )
+      .setFooter({ text: `Server ID: ${guild.id}` })
+      .setTimestamp();
+
+    await interaction.reply({ embeds: [embed] });
   }
 });
 
