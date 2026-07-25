@@ -30,7 +30,9 @@ const commands = [
 
   new SlashCommandBuilder()
     .setName('dm')
-    .setDescription('Sends a specific message to your DMs'),
+    .setDescription('Sends a custom message to a user in their DMs')
+    .addUserOption(option => option.setName('user').setDescription('The user to message').setRequired(true))
+    .addStringOption(option => option.setName('message').setDescription('The message to send').setRequired(true)),
 
   new SlashCommandBuilder()
     .setName('ban')
@@ -65,17 +67,19 @@ const commands = [
 client.once('ready', async () => {
   console.log(`Logged in as ${client.user.tag}!`);
 
-  // Register commands instantly to your specific server using your Guild ID
   const GUILD_ID = '1430150908490027090';
   const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
   
   try {
     console.log('Started refreshing guild (/) commands.');
+    
+    // This overwrites all old commands with ONLY the new array list
     await rest.put(
       Routes.applicationGuildCommands(client.user.id, GUILD_ID),
       { body: commands },
     );
-    console.log('Successfully reloaded guild (/) commands.');
+    
+    console.log('Successfully reloaded and cleared old guild (/) commands.');
   } catch (error) {
     console.error(error);
   }
@@ -92,11 +96,14 @@ client.on('interactionCreate', async interaction => {
   } 
   
   else if (commandName === 'dm') {
+    const targetUser = interaction.options.getUser('user');
+    const messageContent = interaction.options.getString('message');
+
     try {
-      await interaction.user.send('Hello! Here is your requested specific message from the server.');
-      await interaction.reply({ content: 'I have sent you a message in your DMs!', ephemeral: true });
+      await targetUser.send(messageContent);
+      await interaction.reply({ content: `Successfully sent a DM to **${targetUser.tag}**!`, ephemeral: true });
     } catch (error) {
-      await interaction.reply({ content: 'I could not send you a DM. Please check if your DMs are open.', ephemeral: true });
+      await interaction.reply({ content: `Could not send a DM to **${targetUser.tag}**. Their DMs might be closed.`, ephemeral: true });
     }
   } 
   
