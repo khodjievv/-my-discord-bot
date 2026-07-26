@@ -89,7 +89,20 @@ const commands = [
 
   new SlashCommandBuilder()
     .setName('ticketpanel')
-    .setDescription('Posts the ticket support portal panel')
+    .setDescription('Posts the ticket support portal panel'),
+
+  new SlashCommandBuilder()
+    .setName('say')
+    .setDescription('Makes the bot repeat your message (requires mentioning the bot)')
+    .addStringOption(option => 
+      option.setName('message')
+        .setDescription('The message you want the bot to say')
+        .setRequired(true)
+    ),
+
+  new SlashCommandBuilder()
+    .setName('gamestats')
+    .setDescription('Fetches and displays live stats from your Roblox game')
 ].map(command => command.toJSON());
 
 client.once('ready', async () => {
@@ -120,6 +133,7 @@ client.on('guildMemberAdd', async member => {
     .setTitle('👋 Welcome to the Server!')
     .setDescription(`Hey ${member}, welcome to **${member.guild.name}**! We are thrilled to have you here. Make sure to check out the rules and enjoy your stay!`)
     .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
+    .setImage('https://media.discordapp.net/attachments/1458034925793054730/1530870776670982194/combined_newtext_clean.png?ex=6a672603&is=6a65d483&hm=863e295e5ac0ac3058519ca063446f47c07c78f811ffebd5cf64341a2fa5bc42&=&format=webp&quality=lossless&width=1196&height=672')
     .setTimestamp();
 
   await welcomeChannel.send({ embeds: [welcomeEmbed] });
@@ -426,6 +440,68 @@ client.on('interactionCreate', async interaction => {
       );
 
       await interaction.reply({ embeds: [embed], components: [row] });
+    }
+
+    else if (commandName === 'say') {
+      const messageText = interaction.options.getString('message');
+
+      if (!messageText.includes(client.user.id)) {
+        return interaction.reply({ 
+          content: `❌ You must mention the bot (e.g., @${client.user.username}) inside your message text to use this command!`, 
+          ephemeral: true 
+        });
+      }
+
+      await interaction.reply({ content: 'Message sent successfully!', ephemeral: true });
+      await interaction.channel.send({ content: messageText });
+    }
+
+    else if (commandName === 'gamestats') {
+      await interaction.deferReply();
+
+      const universeId = '10543353328'; 
+
+      try {
+        const response = await fetch(`https://games.roblox.com/v1/games?universeIds=${universeId}`);
+        const data = await response.json();
+
+        if (!data.data || data.data.length === 0) {
+          return interaction.editReply({ content: '❌ Could not find game data. Check your Universe ID!' });
+        }
+
+        const game = data.data[0];
+
+        const votesResponse = await fetch(`https://games.roblox.com/v1/games/${universeId}/votes`);
+        const votesData = await votesResponse.json();
+
+        const upVotes = votesData.upVotes || 0;
+        const downVotes = votesData.downVotes || 0;
+        const totalVotes = upVotes + downVotes;
+        const approvalRate = totalVotes > 0 ? Math.round((upVotes / totalVotes) * 100) : 0;
+
+        const embed = new EmbedBuilder()
+          .setColor('#00b0f4')
+          .setTitle(`⚡ [ 🎮 ${game.name.toUpperCase()} LIVE STATS ] ⚡`)
+          .setDescription(
+            `**GAME TELEMETRY**\n\n` +
+            `👥 **Active Players:** \`${game.playing.toLocaleString()}\`\n` +
+            `🚀 **Total Visits:** \`${game.visits.toLocaleString()}\`\n\n` +
+            `───────────────────────────────────\n\n` +
+            `**COMMUNITY RATINGS**\n\n` +
+            `⭐ **Favorites:** \`${game.favoritedCount.toLocaleString()}\` Favorites ⭐\n` +
+            `👍 **Approval Rating:** \`${approvalRate}%\` (${upVotes.toLocaleString()} Likes)\n\n` +
+            `───────────────────────────────────\n\n` +
+            `🌐 **STATUS:** \`ONLINE\``
+          )
+          .setThumbnail('https://images.rbxcdn.com/39322bc627582b13fa2592fa44a5359a')
+          .setFooter({ text: `Requested by ${interaction.user.tag}` })
+          .setTimestamp();
+
+        await interaction.editReply({ embeds: [embed] });
+      } catch (error) {
+        console.error('Failed to fetch Roblox API:', error);
+        await interaction.editReply({ content: '❌ Failed to connect to Roblox API.' });
+      }
     }
   } catch (error) {
     console.error('Error handling command:', error);
