@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits, ActionRowBuilder, StringSelectMenuBuilder, ChannelType, PermissionsBitField } = require('discord.js');
+const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, ChannelType, PermissionsBitField } = require('discord.js');
 const express = require('express');
 
 // Express server for Render
@@ -13,7 +13,7 @@ app.listen(PORT, () => {
   console.log(`Web server is running on port ${PORT}`);
 });
 
-// Discord Bot setup with full necessary intents (Including DirectMessages)
+// Discord Bot setup with full necessary intents
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -80,7 +80,7 @@ const commands = [
 
   new SlashCommandBuilder()
     .setName('serverinfo')
-    .setDescription('Shows detailed and cool-looking information about the server'),
+    .setDescription('Shows detailed information about the server'),
 
   new SlashCommandBuilder()
     .setName('userinfo')
@@ -100,12 +100,10 @@ client.once('ready', async () => {
   
   try {
     console.log('Started refreshing guild (/) commands.');
-    
     await rest.put(
       Routes.applicationGuildCommands(client.user.id, GUILD_ID),
       { body: commands },
     );
-    
     console.log('Successfully reloaded and updated guild (/) commands.');
   } catch (error) {
     console.error(error);
@@ -127,27 +125,102 @@ client.on('guildMemberAdd', async member => {
   await welcomeChannel.send({ embeds: [welcomeEmbed] });
 });
 
-// DM Reply Listener: Forwards messages sent to the bot's DMs into a specific channel
+// Auto-Moderation & Commands System (Polls & Giveaways)
+const badWords = ['badword1', 'badword2', 'scamlink.com'];
+
 client.on('messageCreate', async message => {
   if (message.author.bot) return;
-  if (message.guild) return; 
 
-  const logChannelId = '1468122780183560262'; 
-  const logChannel = client.channels.cache.get(logChannelId);
-  
-  if (!logChannel) return;
+  // 1. Auto-Moderation
+  if (message.guild) {
+    const contentLower = message.content.toLowerCase();
+    const containsForbidden = badWords.some(word => contentLower.includes(word));
+    const containsInvite = contentLower.includes('discord.gg/') || contentLower.includes('discord.com/invite/');
 
-  const replyEmbed = new EmbedBuilder()
-    .setColor('#5865F2')
-    .setTitle(`📩 ${message.author.tag} Replied`)
-    .setDescription(message.content || '[Attached an image/embed]')
-    .addFields(
-      { name: 'User ID', value: message.author.id, inline: true }
-    )
-    .setThumbnail(message.author.displayAvatarURL({ dynamic: true }))
-    .setTimestamp();
+    if (containsForbidden || containsInvite) {
+      try {
+        await message.delete();
+        const warningMsg = await message.channel.send(`${message.author}, that type of content is not allowed here!`);
+        setTimeout(() => warningMsg.delete().catch(() => {}), 5000);
+        return;
+      } catch (err) {
+        console.error('Auto-mod deletion failed:', err);
+      }
+    }
+  }
 
-  await logChannel.send({ embeds: [replyEmbed] });
+  // 2. Poll System (!poll)
+  if (message.content.startsWith('!poll ')) {
+    const pollQuery = message.content.slice(6);
+    if (!pollQuery) return message.reply('Please provide a question for the poll!');
+
+    const pollEmbed = new EmbedBuilder()
+      .setColor('#5200ff')
+      .setTitle('📊 Community Poll')
+      .setDescription(pollQuery)
+      .setFooter({ text: `Poll started by ${message.author.tag}` })
+      .setTimestamp();
+
+    const pollMessage = await message.channel.send({ embeds: [pollEmbed] });
+    await pollMessage.react('👍');
+    await pollMessage.react('👎');
+    await message.delete().catch(() => {});
+  }
+
+  // 3. Giveaway System (!giveaway)
+  if (message.content.startsWith('!giveaway ')) {
+    const args = message.content.slice(10).split(' ');
+    const prize = args.join(' ');
+
+    if (!prize) return message.reply('Usage: `!giveaway [prize name]`');
+
+    const giveawayEmbed = new EmbedBuilder()
+      .setColor('#ffd700')
+      .setTitle('🎉 GIVEAWAY TIME! 🎉')
+      .setDescription(`Prize: **${prize}**\nReact with 🎉 to enter!\nHosted by: ${message.author}`)
+      .setTimestamp();
+
+    const gMessage = await message.channel.send({ embeds: [giveawayEmbed] });
+    await gMessage.react('🎉');
+
+    setTimeout(async () => {
+      try {
+        const fetchedMsg = await message.channel.messages.fetch(gMessage.id);
+        const reaction = fetchedMsg.reactions.cache.get('🎉');
+
+        if (!reaction) return message.channel.send('Giveaway ended with no reactions.');
+
+        const users = await reaction.users.fetch();
+        const entrants = users.filter(user => !user.bot);
+
+        if (entrants.size === 0) {
+          return message.channel.send(`Giveaway for **${prize}** ended, but no valid entries were found!`);
+        }
+
+        const winner = entrants.random();
+        message.channel.send(`🎊 Congratulations ${winner}! You won the **${prize}**!`);
+      } catch (err) {
+        console.error('Giveaway error:', err);
+      }
+    }, 60000); // Ends after 1 minute (Change as needed)
+  }
+
+  // 4. DM Forwarding to Log Channel
+  if (!message.guild) {
+    const logChannelId = '1430151280092905666'; 
+    const logChannel = client.channels.cache.get(logChannelId);
+    if (!logChannel) return;
+
+    const replyEmbed = new EmbedBuilder()
+      .setColor('#5865F2')
+      .setTitle(`📩 ${message.author.tag} Replied`)
+      .setDescription(message.content || '[Attached an image/embed]')
+      .addFields({ name: 'User ID', value: message.author.id, inline: true })
+      .setThumbnail(message.author.displayAvatarURL({ dynamic: true }))
+      .setTimestamp();
+
+    await logChannel.send({ embeds: [replyEmbed] });
+  }
 });
 
 // Handle Slash Command Interactions
@@ -362,54 +435,66 @@ client.on('interactionCreate', async interaction => {
   }
 });
 
-// Handle Ticket Dropdown Selections
+// Handle Ticket Dropdown & Button Actions (Claim & Close)
 client.on('interactionCreate', async interaction => {
-  if (!interaction.isStringSelectMenu()) return;
-  if (interaction.customId !== 'ticket_category_select') return;
+  if (interaction.isStringSelectMenu() && interaction.customId === 'ticket_category_select') {
+    await interaction.deferReply({ ephemeral: true });
 
-  await interaction.deferReply({ ephemeral: true });
+    const categoryValue = interaction.values[0];
+    const guild = interaction.guild;
+    const member = interaction.member;
 
-  const categoryValue = interaction.values[0];
-  const guild = interaction.guild;
-  const member = interaction.member;
+    const existingChannel = guild.channels.cache.find(c => c.name === `ticket-${member.user.username.toLowerCase()}`);
+    if (existingChannel) {
+      return interaction.editReply({ content: `❌ You already have an active ticket open here: ${existingChannel}` });
+    }
 
-  const existingChannel = guild.channels.cache.find(c => c.name === `ticket-${member.user.username.toLowerCase()}`);
-  if (existingChannel) {
-    return interaction.editReply({ content: `❌ You already have an active ticket open here: ${existingChannel}` });
+    try {
+      const ticketChannel = await guild.channels.create({
+        name: `ticket-${member.user.username}`,
+        type: ChannelType.GuildText,
+        permissionOverwrites: [
+          { id: guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
+          { id: member.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory] },
+          { id: client.user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] },
+        ],
+      });
+
+      await interaction.editReply({ content: `✅ Your ticket has been created! Head over to ${ticketChannel}` });
+
+      const welcomeEmbed = new EmbedBuilder()
+        .setColor('#7289da')
+        .setTitle(`Ticket: ${categoryValue.replace('_', ' ').toUpperCase()}`)
+        .setDescription(`Hello ${member}, thank you for reaching out.\n\nPlease describe your issue in detail, and a staff member will be with you shortly.`);
+
+      const ticketButtons = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('claim_ticket').setLabel('🔒 Claim Ticket').setStyle(ButtonStyle.Primary),
+        new ButtonBuilder().setCustomId('close_ticket').setLabel('✖ Close Ticket').setStyle(ButtonStyle.Danger)
+      );
+
+      await ticketChannel.send({ content: `${member}`, embeds: [welcomeEmbed], components: [ticketButtons] });
+
+    } catch (error) {
+      console.error('Error creating ticket channel:', error);
+      await interaction.editReply({ content: '❌ Failed to create your ticket channel. Please check bot permissions.' });
+    }
   }
 
-  try {
-    const ticketChannel = await guild.channels.create({
-      name: `ticket-${member.user.username}`,
-      type: ChannelType.GuildText,
-      permissionOverwrites: [
-        {
-          id: guild.id,
-          deny: [PermissionsBitField.Flags.ViewChannel],
-        },
-        {
-          id: member.id,
-          allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory],
-        },
-        {
-          id: client.user.id,
-          allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages],
-        },
-      ],
-    });
-
-    await interaction.editReply({ content: `✅ Your ticket has been created! Head over to ${ticketChannel}` });
-
-    const welcomeEmbed = new EmbedBuilder()
-      .setColor('#7289da')
-      .setTitle(`Ticket: ${categoryValue.replace('_', ' ').toUpperCase()}`)
-      .setDescription(`Hello ${member}, thank you for reaching out.\n\nPlease describe your issue in detail, and a staff member will be with you shortly.`);
-
-    await ticketChannel.send({ content: `${member}`, embeds: [welcomeEmbed] });
-
-  } catch (error) {
-    console.error('Error creating ticket channel:', error);
-    await interaction.editReply({ content: '❌ Failed to create your ticket channel. Please check bot permissions.' });
+  else if (interaction.isButton()) {
+    if (interaction.customId === 'claim_ticket') {
+      await interaction.reply({ content: `🎫 This ticket has been claimed by ${interaction.user}!` });
+    } 
+    
+    else if (interaction.customId === 'close_ticket') {
+      await interaction.reply({ content: '⚠️ Closing ticket in 5 seconds...' });
+      setTimeout(async () => {
+        try {
+          await interaction.channel.delete();
+        } catch (err) {
+          console.error('Failed to delete channel:', err);
+        }
+      }, 5000);
+    }
   }
 });
 
