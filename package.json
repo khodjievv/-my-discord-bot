@@ -5,9 +5,9 @@
   "scripts": {
     "start": "node index.js"
   },
-  "dependencies": {
-    "discord.js": "^14.x.x",
-    "express": "^4.x.x"
-  }
+"dependencies": {
+  "discord.js": "^14.14.0",
+  "express": "^4.19.2"
+}
 }
 
