@@ -139,7 +139,7 @@ client.once('ready', async () => {
   console.log(`Logged in as ${client.user.tag}!`);
 
   const GUILD_ID = '1430150908490027090';
-const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
+  const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
   
   try {
     console.log('Started refreshing guild (/) commands.');
@@ -246,7 +246,7 @@ client.on('messageCreate', async message => {
       } catch (err) {
         console.error('Giveaway error:', err);
       }
-    }, 60000); // Ends after 1 minute (Change as needed)
+    }, 60000);
   }
 
   // 4. DM Forwarding to Log Channel
@@ -487,7 +487,6 @@ client.on('interactionCreate', async interaction => {
 
     else if (commandName === 'say') {
       const messageText = interaction.options.getString('message');
-
       await interaction.reply({ content: messageText });
     }
 
@@ -552,7 +551,6 @@ client.on('interactionCreate', async interaction => {
         let userId;
         let displayName;
 
-        // Check if input is a pure numeric User ID or a Username
         if (/^\d+$/.test(input)) {
           userId = input;
           const userRes = await fetch(`https://users.roblox.com/v1/users/${userId}`);
@@ -582,19 +580,18 @@ client.on('interactionCreate', async interaction => {
         const thumbData = await thumbRes.json();
         const avatarUrl = thumbData.data?.[0]?.imageUrl || 'https://images.rbxcdn.com/39322bc627582b13fa2592fa44a5359a';
 
-        // Check both paths: 'players/{userId}' and root '{userId}'
-        let firebaseRes = await fetch(`https://donate-modded-2b27d-default-rtdb.firebaseio.com/players/${userId}.json`);
-        let statsData = await firebaseRes.json();
+        // Direct fetch from root database path matching your Firebase tree structure
+        const firebaseRes = await fetch(`https://donate-modded-2b27d-default-rtdb.firebaseio.com/${userId}.json`);
+        const statsData = await firebaseRes.json();
 
         if (!statsData) {
-          firebaseRes = await fetch(`https://donate-modded-2b27d-default-rtdb.firebaseio.com/${userId}.json`);
-          statsData = await firebaseRes.json();
+          return interaction.editReply({ content: `❌ No stats found in the database for user ID \`${userId}\`.` });
         }
 
-        const donated = statsData?.Donated ?? statsData?.donated ?? 0;
-        const raised = statsData?.Raised ?? statsData?.raised ?? 0;
-        const giftbux = statsData?.Giftbux ?? statsData?.giftbux ?? 0;
-        const robux = statsData?.Robux ?? statsData?.robux ?? 0;
+        const donated = statsData.Donated ?? statsData.donated ?? 0;
+        const raised = statsData.Raised ?? statsData.raised ?? 0;
+        const giftbux = statsData.Giftbux ?? statsData.giftbux ?? 0;
+        const robux = statsData.Robux ?? statsData.robux ?? 0;
 
         const statsEmbed = new EmbedBuilder()
           .setColor('#2b2d31')
@@ -622,28 +619,26 @@ client.on('interactionCreate', async interaction => {
       const category = interaction.options.getString('category');
 
       try {
-        let firebaseRes = await fetch('https://donate-modded-2b27d-default-rtdb.firebaseio.com/players.json');
-        let playersData = await firebaseRes.json();
-
-        if (!playersData) {
-          firebaseRes = await fetch('https://donate-modded-2b27d-default-rtdb.firebaseio.com/.json');
-          playersData = await firebaseRes.json();
-        }
+        // Fetch root database object where user IDs are keys
+        const firebaseRes = await fetch('https://donate-modded-2b27d-default-rtdb.firebaseio.com/.json');
+        const playersData = await firebaseRes.json();
 
         if (!playersData) {
           return interaction.editReply({ content: '❌ No player data found in Firebase yet!' });
         }
 
-        const playerArray = Object.keys(playersData).map(userId => {
-          const p = playersData[userId] || {};
-          return {
-            userId: userId,
-            Donated: p.Donated ?? p.donated ?? 0,
-            Raised: p.Raised ?? p.raised ?? 0,
-            Giftbux: p.Giftbux ?? p.giftbux ?? 0,
-            Robux: p.Robux ?? p.robux ?? 0
-          };
-        });
+        const playerArray = Object.keys(playersData)
+          .filter(key => /^\d+$/.test(key))
+          .map(userId => {
+            const p = playersData[userId] || {};
+            return {
+              userId: userId,
+              Donated: p.Donated ?? p.donated ?? 0,
+              Raised: p.Raised ?? p.raised ?? 0,
+              Giftbux: p.Giftbux ?? p.giftbux ?? 0,
+              Robux: p.Robux ?? p.robux ?? 0
+            };
+          });
 
         playerArray.sort((a, b) => {
           const valA = Number(a[category]) || 0;
@@ -698,7 +693,7 @@ client.on('interactionCreate', async interaction => {
   }
 });
 
-// Handle Ticket Dropdown & Button Actions (Claim & Close)
+// Handle Ticket Dropdown
 client.on('interactionCreate', async interaction => {
   if (interaction.isStringSelectMenu() && interaction.customId === 'ticket_category_select') {
     await interaction.deferReply({ ephemeral: true });
@@ -718,7 +713,7 @@ client.on('interactionCreate', async interaction => {
         type: ChannelType.GuildText,
         permissionOverwrites: [
           { id: guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
-          { id: member.id, allow: [PermissionsBitField.Flags.ViewChannel,PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory] },
+          { id: member.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory] },
           { id: client.user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] },
         ],
       });
@@ -730,36 +725,30 @@ client.on('interactionCreate', async interaction => {
         .setTitle(`Ticket: ${categoryValue.replace('_', ' ').toUpperCase()}`)
         .setDescription(`Hello ${member}, thank you for reaching out.\n\nPlease describe your issue in detail, and a staff member will be with you shortly.`);
 
-      const ticketButtons = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId('claim_ticket').setLabel('🔒 Claim Ticket').setStyle(ButtonStyle.Primary),
-        new ButtonBuilder().setCustomId('close_ticket').setLabel('✖ Close Ticket').setStyle(ButtonStyle.Danger)
+      const closeButton = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId('close_ticket')
+          .setLabel('🔒 Close Ticket')
+          .setStyle(ButtonStyle.Danger)
       );
 
-      await ticketChannel.send({ content: `${member}`, embeds: [welcomeEmbed], components: [ticketButtons] });
-
+      await ticketChannel.send({ embeds: [welcomeEmbed], components: [closeButton] });
     } catch (error) {
-      console.error('Error creating ticket channel:', error);
-      await interaction.editReply({ content: '❌ Failed to create your ticket channel. Please check bot permissions.' });
+      console.error('Failed to create ticket channel:', error);
+      await interaction.editReply({ content: '❌ Failed to create your ticket channel.' });
     }
-  }
-
-  else if (interaction.isButton()) {
-    if (interaction.customId === 'claim_ticket') {
-      await interaction.reply({ content: `🎫 This ticket has been claimed by ${interaction.user}!` });
-    } 
-    
-    else if (interaction.customId === 'close_ticket') {
-      await interaction.reply({ content: '⚠️ Closing ticket in 5 seconds...' });
-      setTimeout(async () => {
-        try {
-          await interaction.channel.delete();
-        } catch (err) {
-          console.error('Failed to delete channel:', err);
-        }
-      }, 5000);
-    }
+  } 
+  
+  else if (interaction.isButton() && interaction.customId === 'close_ticket') {
+    await interaction.reply({ content: '🔒 Closing this ticket in 5 seconds...' });
+    setTimeout(async () => {
+      try {
+        await interaction.channel.delete();
+      } catch (err) {
+        console.error('Failed to delete ticket channel:', err);
+      }
+    }, 5000);
   }
 });
 
-client.json = undefined;
 client.login(process.env.TOKEN);
