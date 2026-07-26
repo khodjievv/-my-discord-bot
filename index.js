@@ -132,6 +132,27 @@ const commands = [
           { name: 'Giftbux', value: 'Giftbux' },
           { name: 'Robux', value: 'Robux' }
         )
+    ),
+
+  new SlashCommandBuilder()
+    .setName('resetstats')
+    .setDescription('Resets a player specific stat or all stats in Firebase')
+    .addStringOption(option =>
+      option.setName('username')
+        .setDescription('Roblox username or User ID to reset')
+        .setRequired(true)
+    )
+    .addStringOption(option =>
+      option.setName('stat')
+        .setDescription('Which stat to reset')
+        .setRequired(true)
+        .addChoices(
+          { name: 'All Stats', value: 'All' },
+          { name: 'Donated', value: 'Donated' },
+          { name: 'Raised', value: 'Raised' },
+          { name: 'Giftbux', value: 'Giftbux' },
+          { name: 'Robux', value: 'Robux' }
+        )
     )
 ].map(command => command.toJSON());
 
@@ -673,7 +694,6 @@ client.on('interactionCreate', async interaction => {
           .setFooter({ text: `Requested by ${interaction.user.tag}` })
           .setTimestamp();
 
-        // Loop through each top player and fetch their avatar/username to add as individual fields
         for (let i = 0; i < topPlayers.length; i++) {
           const player = topPlayers[i];
           const rankEmoji = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `\`#${i + 1}\``;
@@ -699,7 +719,6 @@ client.on('interactionCreate', async interaction => {
 
           const statValue = Number(player[category] || 0).toLocaleString();
           
-          // Add a field for each player showing their avatar representation or details
           leaderboardEmbed.addFields({
             name: `${rankEmoji} Rank ${i + 1}`,
             value: `👤 ${username}\n🖼️ [Avatar Link](${avatarUrl})\n📊 **${category}:** \`${statValue}\``,
@@ -711,6 +730,80 @@ client.on('interactionCreate', async interaction => {
       } catch (error) {
         console.error('Failed to generate leaderboard:', error);
         await interaction.editReply({ content: '❌ Failed to fetch leaderboard data from Firebase.' });
+      }
+    }
+
+    else if (commandName === 'resetstats') {
+      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+        return interaction.reply({ content: '❌ You need **Administrator** permissions to use this command.', ephemeral: true });
+      }
+
+      await interaction.deferReply({ ephemeral: true });
+      const input = interaction.options.getString('username').trim();
+      const statChoice = interaction.options.getString('stat');
+
+      try {
+        let userId;
+        let displayName;
+
+        if (/^\d+$/.test(input)) {
+          userId = input;
+          const userRes = await fetch(`https://users.roblox.com/v1/users/${userId}`);
+          const userData = await userRes.json();
+          if (!userData || userData.errors) {
+            return interaction.editReply({ content: `❌ Could not find a Roblox user with the ID **${input}**.` });
+          }
+          displayName = userData.displayName || userData.name;
+        } else {
+          const userRes = await fetch('https://users.roblox.com/v1/users/search', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ keyword: input, limit: 1 })
+          });
+          const userData = await userRes.json();
+
+          if (!userData.data || userData.data.length === 0) {
+            return interaction.editReply({ content: `❌ Could not find a Roblox user with the name **${input}**.` });
+          }
+
+          const robloxUser = userData.data[0];
+          userId = robloxUser.id.toString();
+          displayName = robloxUser.displayName;
+        }
+
+        const firebaseCheckRes = await fetch(`https://donate-modded-2b27d-default-rtdb.firebaseio.com/${userId}.json`);
+        const existingData = await firebaseCheckRes.json();
+
+        if (!existingData) {
+          return interaction.editReply({ content: `❌ No record exists in Firebase for **${displayName}** (ID: \`${userId}\`).` });
+        }
+
+        if (statChoice === 'All') {
+          await fetch(`https://donate-modded-2b27d-default-rtdb.firebaseio.com/${userId}.json`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ Donated: 0, Raised: 0, Giftbux: 0, Robux: 0 })
+          });
+        } else {
+          const updateObj = {};
+          updateObj[statChoice] = 0;
+          await fetch(`https://donate-modded-2b27d-default-rtdb.firebaseio.com/${userId}.json`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updateObj)
+          });
+        }
+
+        const resetEmbed = new EmbedBuilder()
+          .setColor('#ff3333')
+          .setTitle('🗑️ Player Stats Reset Successful')
+          .setDescription(`Successfully reset **${statChoice}** for **${displayName}** (\`@${userId}\`) in Firebase.`)
+          .setTimestamp();
+
+        await interaction.editReply({ embeds: [resetEmbed] });
+      } catch (error) {
+        console.error('Failed to reset stats in Firebase:', error);
+        await interaction.editReply({ content: '❌ Failed to connect to Firebase to reset player stats.' });
       }
     }
   } catch (error) {
