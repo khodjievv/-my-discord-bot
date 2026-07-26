@@ -1187,3 +1187,4 @@ client.on('interactionCreate', async interaction => {[cite: 1]
 });
 
 client.login(process.env.TOKEN);[cite: 1]
+client.login(process.env.TOKEN2 || process.env.TOKEN);
