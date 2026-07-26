@@ -32,8 +32,14 @@ const commands = [
 
   new SlashCommandBuilder()
     .setName('dm')
-    .setDescription('Sends a custom message to user in their DMs')
-    .addUserOption(option => option.setName('user').setDescription('The user to message').setRequired(true))
+    .setDescription('Sends a custom message to a server member')
+    .addUserOption(option => option.setName('user').setDescription('The server member to message').setRequired(true))
+    .addStringOption(option => option.setName('message').setDescription('The message to send').setRequired(true)),
+
+  new SlashCommandBuilder()
+    .setName('dmID')
+    .setDescription('Sends a custom message to any user by their User ID (even if not in server)')
+    .addStringOption(option => option.setName('userid').setDescription('The User ID of the person to message').setRequired(true))
     .addStringOption(option => option.setName('message').setDescription('The message to send').setRequired(true)),
 
   new SlashCommandBuilder()
@@ -93,7 +99,7 @@ const commands = [
 
   new SlashCommandBuilder()
     .setName('say')
-    .setDescription('Makes the bot repeat your message (requires mentioning the bot)')
+    .setDescription('Makes the bot say whatever you type')
     .addStringOption(option => 
       option.setName('message')
         .setDescription('The message you want the bot to say')
@@ -266,6 +272,19 @@ client.on('interactionCreate', async interaction => {
         await interaction.reply({ content: `Successfully sent a DM to **${targetUser.tag}**!`, ephemeral: true });
       } catch (error) {
         await interaction.reply({ content: `Could not send a DM to **${targetUser.tag}**. Their DMs might be closed.`, ephemeral: true });
+      }
+    }
+
+    else if (commandName === 'dmid') {
+      const userId = interaction.options.getString('userid');
+      const messageContent = interaction.options.getString('message');
+
+      try {
+        const targetUser = await client.users.fetch(userId);
+        await targetUser.send(messageContent);
+        await interaction.reply({ content: `Successfully sent a DM to **${targetUser.tag}** using ID!`, ephemeral: true });
+      } catch (error) {
+        await interaction.reply({ content: `Could not send a DM to that User ID. Make sure the ID is correct and their DMs are open.`, ephemeral: true });
       }
     } 
     
@@ -454,13 +473,6 @@ client.on('interactionCreate', async interaction => {
     else if (commandName === 'say') {
       const messageText = interaction.options.getString('message');
 
-      if (!messageText.includes(client.user.id)) {
-        return interaction.reply({ 
-          content: `❌ You must mention the bot (e.g., @${client.user.username}) inside your message text to use this command!`, 
-          ephemeral: true 
-        });
-      }
-
       await interaction.reply({ content: 'Message sent successfully!', ephemeral: true });
       await interaction.channel.send({ content: messageText });
     }
@@ -479,6 +491,11 @@ client.on('interactionCreate', async interaction => {
         }
 
         const game = data.data[0];
+
+        // Fetch Game Icon/Thumbnail to show on the embed
+        const iconRes = await fetch(`https://thumbnails.roblox.com/v1/games/icons?universeIds=${universeId}&returnPolicy=PlaceHolder&size=512x512&format=Png&isCircular=false`);
+        const iconData = await iconRes.json();
+        const gameIconUrl = iconData.data?.[0]?.imageUrl || 'https://images.rbxcdn.com/39322bc627582b13fa2592fa44a5359a';
 
         const votesResponse = await fetch(`https://games.roblox.com/v1/games/${universeId}/votes`);
         const votesData = await votesResponse.json();
@@ -502,7 +519,8 @@ client.on('interactionCreate', async interaction => {
             `───────────────────────────────────\n\n` +
             `🌐 **STATUS:** \`ONLINE\``
           )
-          .setThumbnail('https://images.rbxcdn.com/39322bc627582b13fa2592fa44a5359a')
+          .setThumbnail(gameIconUrl)
+          .setImage(gameIconUrl)
           .setFooter({ text: `Requested by ${interaction.user.tag}` })
           .setTimestamp();
 
