@@ -338,7 +338,7 @@ client.on('interactionCreate', async interaction => {
         .setColor('#7289da')
         .setTitle('Support Portal')
         .setDescription('👋 **How can we help you today?**\n\nSelect the most relevant category from the menu below to open a ticket.\n\n**Note:** You can only have one active ticket at a time.')
-        .setImage('https://media.discordapp.net/attachments/1430218552354537653/1530850147251130408/photo_10_2026-07-25_19-55-09.jpg?ex=6a6712cc&is=6a65c14c&hm=6ad0b410231f5c9c9c01fa6a6aa8c893eed91895687f93d93533e0b7c2c576b6&=&format=webp&width=1218&height=672');
+        .setImage('https://media.discordapp.net/attachments/1430151280092905666/1530853676615205064/image.png?ex=6a671616&is=6a65c496&hm=cd61181efdeb80664d4de273b480112cd5ce3cd0ad2a44b540c3756c4fcc1693&=&format=webp&quality=lossless&width=1218&height=672');
 
       const row = new ActionRowBuilder().addComponents(
         new StringSelectMenuBuilder()
