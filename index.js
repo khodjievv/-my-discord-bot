@@ -32,7 +32,7 @@ const commands = [
 
   new SlashCommandBuilder()
     .setName('dm')
-    .setDescription('Sends a custom message to a user in their DMs')
+    .setDescription('Sends a custom message to user in their DMs')
     .addUserOption(option => option.setName('user').setDescription('The user to message').setRequired(true))
     .addStringOption(option => option.setName('message').setDescription('The message to send').setRequired(true)),
 
@@ -102,7 +102,16 @@ const commands = [
 
   new SlashCommandBuilder()
     .setName('gamestats')
-    .setDescription('Fetches and displays live stats from your Roblox game')
+    .setDescription('Fetches and displays live stats from your Roblox game'),
+
+  new SlashCommandBuilder()
+    .setName('stats')
+    .setDescription('Check player donation stats from the game')
+    .addStringOption(option => 
+      option.setName('username')
+        .setDescription('Roblox username to lookup')
+        .setRequired(true)
+    )
 ].map(command => command.toJSON());
 
 client.once('ready', async () => {
@@ -501,6 +510,62 @@ client.on('interactionCreate', async interaction => {
       } catch (error) {
         console.error('Failed to fetch Roblox API:', error);
         await interaction.editReply({ content: '❌ Failed to connect to Roblox API.' });
+      }
+    }
+
+    else if (commandName === 'stats') {
+      await interaction.deferReply();
+      const username = interaction.options.getString('username');
+
+      try {
+        // 1. Get Roblox User ID from username
+        const userRes = await fetch('https://users.roblox.com/v1/users/search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ keyword: username, limit: 1 })
+        });
+        const userData = await userRes.json();
+
+        if (!userData.data || userData.data.length === 0) {
+          return interaction.editReply({ content: `❌ Could not find a Roblox user with the name **${username}**.` });
+        }
+
+        const robloxUser = userData.data[0];
+        const userId = robloxUser.id.toString();
+        const displayName = robloxUser.displayName;
+
+        // 2. Get Roblox Avatar Thumbnail
+        const thumbRes = await fetch(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${userId}&size=150x150&format=Png&isCircular=false`);
+        const thumbData = await thumbRes.json();
+        const avatarUrl = thumbData.data?.[0]?.imageUrl || 'https://images.rbxcdn.com/39322bc627582b13fa2592fa44a5359a';
+
+        // 3. Fetch stats directly from your Firebase Realtime Database
+        const firebaseRes = await fetch(`https://donate-modded-2b27d-default-rtdb.firebaseio.com/players/${userId}.json`);
+        const statsData = await firebaseRes.json();
+
+        // Pull exact keys from your Firebase tree matching your exact layout
+        const donated = statsData?.Donated !== undefined ? Number(statsData.Donated).toLocaleString() : "0";
+        const raised = statsData?.Raised !== undefined ? Number(statsData.Raised).toLocaleString() : "0";
+        const giftbux = statsData?.Giftbux !== undefined ? Number(statsData.Giftbux).toLocaleString() : "0";
+
+        // 4. Build and send the Discord Embed matching your exact visual requirement
+        const statsEmbed = new EmbedBuilder()
+          .setColor('#2b2d31')
+          .setAuthor({ name: 'Puataun Utility', iconURL: 'https://images.rbxcdn.com/39322bc627582b13fa2592fa44a5359a' })
+          .setTitle(`✨ ${displayName.toUpperCase()}'S STATS (PDZ)`)
+          .setDescription(
+            `**Donated** 🌟\n${donated}\n\n` +
+            `**Raised** 🎀\n${raised}\n\n` +
+            `**Giftbux**\n${giftbux}`
+          )
+          .setThumbnail(avatarUrl)
+          .setFooter({ text: `User ID: ${userId}` })
+          .setTimestamp();
+
+        await interaction.editReply({ embeds: [statsEmbed] });
+      } catch (error) {
+        console.error('Failed to fetch player stats:', error);
+        await interaction.editReply({ content: '❌ Failed to fetch player statistics from Firebase/Roblox.' });
       }
     }
   } catch (error) {
