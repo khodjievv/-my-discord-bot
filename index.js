@@ -1,3 +1,170 @@
+const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, ChannelType, PermissionsBitField } = require('discord.js');
+const express = require('express');
+
+// Express server for Render
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+app.get('/', (req, res) => {
+  res.send('Bot is alive!');
+});
+
+app.listen(PORT, () => {
+  console.log(`Web server is running on port ${PORT}`);
+});
+
+// Discord Bot setup with full necessary intents
+const client = new Client({
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.GuildMembers,
+    GatewayIntentBits.MessageContent,
+    GatewayIntentBits.DirectMessages
+  ]
+});
+
+// Helper function to resolve Roblox User ID from ID, Username, or Display Name (Nickname)
+async function getRobloxUserId(input) {
+  input = input.trim();
+
+  // 1. If it's purely numbers, treat it as a User ID
+  if (/^\d+$/.test(input)) {
+    const userRes = await fetch(`https://users.roblox.com/v1/users/${input}`);
+    const userData = await userRes.json();
+    if (userData && !userData.errors) {
+      return { userId: input, displayName: userData.displayName || userData.name };
+    }
+  }
+
+  // 2. Search by keyword (Handles Usernames and Display Names/Nicknames)
+  const userRes = await fetch('https://users.roblox.com/v1/users/search', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ keyword: input, limit: 10 })
+  });
+  const userData = await userRes.json();
+
+  if (userData.data && userData.data.length > 0) {
+    const exactMatch = userData.data.find(u => 
+      u.name.toLowerCase() === input.toLowerCase() || 
+      u.displayName.toLowerCase() === input.toLowerCase()
+    ) || userData.data[0];
+
+    return { 
+      userId: exactMatch.id.toString(), 
+      displayName: exactMatch.displayName || exactMatch.name 
+    };
+  }
+
+  return null;
+}
+
+// Define Slash Commands
+const commands = [
+  new SlashCommandBuilder()
+    .setName('pong')
+    .setDescription('Replies with Ping!'),
+
+  new SlashCommandBuilder()
+    .setName('ban')
+    .setDescription('Bans a member from the server')
+    .addUserOption(option => option.setName('user').setDescription('The user to ban').setRequired(true))
+    .addStringOption(option => option.setName('reason').setDescription('Reason for ban').setRequired(false)),
+
+  new SlashCommandBuilder()
+    .setName('unban')
+    .setDescription('Unbans a user by their User ID')
+    .addStringOption(option => option.setName('userid').setDescription('The ID of the user to unban').setRequired(true))
+    .addStringOption(option => option.setName('reason').setDescription('Reason for unban').setRequired(false)),
+
+  new SlashCommandBuilder()
+    .setName('kick')
+    .setDescription('Kicks a member from the server')
+    .addUserOption(option => option.setName('user').setDescription('The user to kick').setRequired(true))
+    .addStringOption(option => option.setName('reason').setDescription('Reason for kick').setRequired(false)),
+
+  new SlashCommandBuilder()
+    .setName('timeout')
+    .setDescription('Timeouts a member')
+    .addUserOption(option => option.setName('user').setDescription('The user to timeout').setRequired(true))
+    .addIntegerOption(option => option.setName('duration').setDescription('Duration in minutes').setRequired(true))
+    .addStringOption(option => option.setName('reason').setDescription('Reason for timeout').setRequired(false)),
+
+  new SlashCommandBuilder()
+    .setName('warn')
+    .setDescription('Issues a warning to a member')
+    .addUserOption(option => option.setName('user').setDescription('The user to warn').setRequired(true))
+    .addStringOption(option => option.setName('reason').setDescription('Reason for warning').setRequired(true)),
+
+  new SlashCommandBuilder()
+    .setName('clear')
+    .setDescription('Clears a specified number of messages from the channel')
+    .addIntegerOption(option => option.setName('amount').setDescription('Number of messages to delete (1-100)').setRequired(true)),
+
+  new SlashCommandBuilder()
+    .setName('serverinfo')
+    .setDescription('Shows detailed information about the server'),
+
+  new SlashCommandBuilder()
+    .setName('userinfo')
+    .setDescription('Shows detailed information about a specific user')
+    .addUserOption(option => option.setName('user').setDescription('The user to inspect').setRequired(false)),
+
+  new SlashCommandBuilder()
+    .setName('ticketpanel')
+    .setDescription('Posts the ticket support portal panel'),
+
+  new SlashCommandBuilder()
+    .setName('gamestats')
+    .setDescription('Fetches and displays live stats from your Roblox game'),
+
+  new SlashCommandBuilder()
+    .setName('stats')
+    .setDescription('Check player donation stats from the game')
+    .addStringOption(option => 
+      option.setName('player')
+        .setDescription('Roblox User ID, Username, or Nickname')
+        .setRequired(true)
+    ),
+
+  new SlashCommandBuilder()
+    .setName('leaderboard')
+    .setDescription('Displays the top 10 player donation leaderboard from the game')
+    .addStringOption(option =>
+      option.setName('category')
+        .setDescription('Choose which stat to rank by')
+        .setRequired(true)
+        .addChoices(
+          { name: 'Donated', value: 'Donated' },
+          { name: 'Raised', value: 'Raised' },
+          { name: 'Giftbux', value: 'Giftbux' },
+          { name: 'Robux', value: 'Robux' }
+        )
+    ),
+
+  new SlashCommandBuilder()
+    .setName('resetstats')
+    .setDescription('Resets a player specific stat or all stats in Firebase')
+    .addStringOption(option =>
+      option.setName('player')
+        .setDescription('Roblox User ID, Username, or Nickname to reset')
+        .setRequired(true)
+    )
+    .addStringOption(option =>
+      option.setName('stat')
+        .setDescription('Which stat to reset')
+        .setRequired(true)
+        .addChoices(
+          { name: 'All Stats', value: 'All' },
+          { name: 'Donated', value: 'Donated' },
+          { name: 'Raised', value: 'Raised' },
+          { name: 'Giftbux', value: 'Giftbux' },
+          { name: 'Robux', value: 'Robux' }
+        )
+    ),
+
+  new SlashCommandBuilder()
     .setName('createcode')
     .setDescription('Creates a game promo code and saves it to Firebase')
     .addStringOption(option => option.setName('code').setDescription('The promo code text (e.g., RELEASE)').setRequired(true))
@@ -35,27 +202,13 @@
     .setDescription('Globally bans a user from both Discord and the Roblox game')
     .addUserOption(option => option.setName('target').setDescription('Discord user to ban').setRequired(true))
     .addStringOption(option => option.setName('robloxid').setDescription('Roblox User ID to blacklist').setRequired(true))
-    .addStringOption(option => option.setName('reason').setDescription('Reason for global ban').setRequired(false)),
-
-  new SlashCommandBuilder()
-    .setName('giveaway')
-    .setDescription('Host an epic game giveaway')
-    .addStringOption(option => option.setName('prize').setDescription('What are you giving away? (e.g. 5,000 Robux)').setRequired(true))
-    .addIntegerOption(option => option.setName('winners').setDescription('Number of winners').setRequired(true))
-    .addIntegerOption(option => option.setName('duration').setDescription('Duration in minutes').setRequired(true)),
-
-  new SlashCommandBuilder()
-    .setName('poll')
-    .setDescription('Create a live voting poll synced with Firebase telemetry')
-    .addStringOption(option => option.setName('question').setDescription('The question you want to ask').setRequired(true))
-    .addStringOption(option => option.setName('option1').setDescription('First choice').setRequired(true))
-    .addStringOption(option => option.setName('option2').setDescription('Second choice').setRequired(true))
+    .addStringOption(option => option.setName('reason').setDescription('Reason for global ban').setRequired(false))
 ].map(command => command.toJSON());
 
 client.once('ready', async () => {
-  console.log(`Logged in as ${client.user.tag}![cite: 3]`);
+  console.log(`Logged in as ${client.user.tag}!`);[cite: 3]
 
-  const GUILD_ID = '1530333292052611093';
+  const GUILD_ID = '1430150908490027090';
   const rest = new REST({ version: '10' }).setToken(process.env.TOKEN || process.env.TOKEN2);
   
   try {
@@ -145,75 +298,13 @@ client.on('messageCreate', async message => {
   }
 });
 
-// Handle Slash Command & Button/Poll Interactions
+// Handle Slash Command & Button Interactions
 client.on('interactionCreate', async interaction => {
-  // Handle Button / Interactive Component Clicks
+  // Handle Button Component Clicks
   if (interaction.isButton()) {
     const customId = interaction.customId;
 
-    // A. Giveaway Entry Button Handler
-    if (customId.startsWith('enter_gw_')) {
-      const giveawayId = customId.replace('enter_gw_', '');
-      const userRef = `https://donate-modded-2b27d-default-rtdb.firebaseio.com/ActiveGiveaways/${giveawayId}/participants/${interaction.user.id}.json`;
-      
-      const checkRes = await fetch(userRef);
-      const joined = await checkRes.json();
-
-      if (joined) {
-        return interaction.reply({ content: '⚠️ You are already entered into this giveaway!', ephemeral: true });
-      }
-
-      await fetch(userRef, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: interaction.user.tag, timestamp: Date.now() })
-      });
-
-      return interaction.reply({ content: `✅ **Entry Confirmed!** You are officially entered to win!`, ephemeral: true });
-    }
-
-    // B. Poll Voting Button Handler
-    if (customId.startsWith('vote_')) {
-      const parts = customId.split('_');
-      const pollId = parts[1];
-      const optionNum = parts[2]; // '1' or '2'
-
-      const pollRef = `https://donate-modded-2b27d-default-rtdb.firebaseio.com/Polls/${pollId}.json`;
-      const res = await fetch(pollRef);
-      const pollData = await res.json();
-
-      if (!pollData) {
-        return interaction.reply({ content: '❌ This poll no longer exists.', ephemeral: true });
-      }
-
-      if (pollData.voters && pollData.voters[interaction.user.id]) {
-        return interaction.reply({ content: '⚠️ You have already voted in this poll!', ephemeral: true });
-      }
-
-      // Update vote counts and track voter
-      const updatedVoters = pollData.voters || {};
-      updatedVoters[interaction.user.id] = optionNum;
-
-      let v1 = pollData.votes1 || 0;
-      let v2 = pollData.votes2 || 0;
-      if (optionNum === '1') v1++;
-      if (optionNum === '2') v2++;
-
-      await fetch(pollRef, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ votes1: v1, votes2: v2, voters: updatedVoters })
-      });
-
-      // Update embed UI dynamically
-      const updatedEmbed = EmbedBuilder.from(interaction.message.embeds[0])
-        .setDescription(`**${pollData.question}**\n\n🟢 **[1]** ${pollData.opt1} (${v1} votes)\n🔵 **[2]** ${pollData.opt2} (${v2} votes)`);
-
-      await interaction.message.edit({ embeds: [updatedEmbed] });
-      return interaction.reply({ content: `✅ Successfully voted for option **${optionNum === '1' ? pollData.opt1 : pollData.opt2}**!`, ephemeral: true });
-    }
-
-    // C. Ticket Close Button Handler
+    // Ticket Close Button Handler
     if (customId === 'close_ticket') {
       await interaction.reply({ content: '🔒 Closing this ticket in 5 seconds...', ephemeral: true });
       setTimeout(async () => {
@@ -236,31 +327,6 @@ client.on('interactionCreate', async interaction => {
   try {
     if (commandName === 'pong') {
       await interaction.reply({ content: 'Ping!', ephemeral: true });
-    } 
-    
-    else if (commandName === 'dm') {
-      const targetUser = interaction.options.getUser('user');
-      const messageContent = interaction.options.getString('message');
-
-      try {
-        await targetUser.send(messageContent);
-        await interaction.reply({ content: `Successfully sent a DM to **${targetUser.tag}**!`, ephemeral: true });
-      } catch (error) {
-        await interaction.reply({ content: `Could not send a DM to **${targetUser.tag}**. Their DMs might be closed.`, ephemeral: true });
-      }
-    }
-
-    else if (commandName === 'dmid') {
-      const userId = interaction.options.getString('userid');
-      const messageContent = interaction.options.getString('message');
-
-      try {
-        const targetUser = await client.users.fetch(userId);
-        await targetUser.send(messageContent);
-        await interaction.reply({ content: `Successfully sent a DM to **${targetUser.tag}** using ID!`, ephemeral: true });
-      } catch (error) {
-        await interaction.reply({ content: `Could not send a DM to that User ID. Make sure the ID is correct and their DMs are open.`, ephemeral: true });
-      }
     } 
     
     else if (commandName === 'ban') {
@@ -360,28 +426,6 @@ client.on('interactionCreate', async interaction => {
       }
     } 
     
-    else if (commandName === 'announce') {
-      if (!interaction.member.permissions.has(PermissionFlagsBits.ManageMessages)) {
-        return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
-      }
-      const channel = interaction.options.getChannel('channel');
-      const messageText = interaction.options.getString('message');
-
-      if (!channel.isTextBased()) {
-        return interaction.reply({ content: 'Please select a valid text channel.', ephemeral: true });
-      }
-
-      const embed = new EmbedBuilder()
-        .setColor('#5865F2')
-        .setTitle('📢 Server Announcement')
-        .setDescription(messageText)
-        .setFooter({ text: `Announced by ${interaction.user.tag}` })
-        .setTimestamp();
-
-      await channel.send({ embeds: [embed] });
-      await interaction.reply({ content: `Announcement successfully sent to ${channel}!`, ephemeral: true });
-    } 
-    
     else if (commandName === 'serverinfo') {
       const { guild } = interaction;
       const owner = await guild.fetchOwner();
@@ -443,11 +487,6 @@ client.on('interactionCreate', async interaction => {
       );
 
       await interaction.reply({ embeds: [embed], components: [row] });
-    }
-
-    else if (commandName === 'say') {
-      const messageText = interaction.options.getString('message');
-      await interaction.reply({ content: messageText });
     }
 
     else if (commandName === 'gamestats') {
@@ -855,101 +894,6 @@ client.on('interactionCreate', async interaction => {
         .setTimestamp();
 
       await interaction.editReply({ embeds: [banEmbed] });
-    }
-
-    else if (commandName === 'giveaway') {
-      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
-        return interaction.reply({ content: '❌ Administrator permission required.', ephemeral: true });
-      }
-
-      const prize = interaction.options.getString('prize');
-      const winnerCount = interaction.options.getInteger('winners');
-      const durationMinutes = interaction.options.getInteger('duration');
-      const endTime = Date.now() + (durationMinutes * 60 * 1000);
-      const giveawayId = `gw_${Date.now()}`;
-
-      await fetch(`https://donate-modded-2b27d-default-rtdb.firebaseio.com/ActiveGiveaways/${giveawayId}.json`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prize, participants: {}, status: 'active', endTime })
-      });
-
-      const enterButton = new ButtonBuilder()
-        .setCustomId(`enter_gw_${giveawayId}`)
-        .setLabel('🎉 ENTER GIVEAWAY')
-        .setStyle(ButtonStyle.Success);
-
-      const row = new ActionRowBuilder().addComponents(enterButton);
-
-      const embed = new EmbedBuilder()
-        .setColor('#00ffcc')
-        .setTitle('🎉 EPIC GAME GIVEAWAY 🎉')
-        .setDescription(`Prize: **${prize}**\nWinners: **${winnerCount}**\nEnds: <t:${Math.floor(endTime / 1000)}:R>\n\nClick the button below to secure your entry!`)
-        .setFooter({ text: `Hosted by ${interaction.user.tag}` })
-        .setTimestamp(endTime);
-
-      const msg = await interaction.reply({ embeds: [embed], components: [row], fetchReply: true });
-
-      setTimeout(async () => {
-        try {
-          const res = await fetch(`https://donate-modded-2b27d-default-rtdb.firebaseio.com/ActiveGiveaways/${giveawayId}/participants.json`);
-          const participantsObj = await res.json();
-
-          if (!participantsObj) {
-            return msg.edit({ content: `❌ Giveaway for **${prize}** ended, but nobody entered!`, embeds: [], components: [] });
-          }
-
-          const userIds = Object.keys(participantsObj);
-          const winners = [];
-
-          for (let i = 0; i < Math.min(winnerCount, userIds.length); i++) {
-            const randomIndex = Math.floor(Math.random() * userIds.length);
-            winners.push(participantsObj[userIds[randomIndex]].username);
-            userIds.splice(randomIndex, 1);
-          }
-
-          const endedEmbed = new EmbedBuilder()
-            .setColor('#ff007f')
-            .setTitle('🎉 GIVEAWAY CONCLUDED 🎉')
-            .setDescription(`Prize: **${prize}**\n\n👑 **Winner(s):**\n${winners.map(w => `• ${w}`).join('\n')}`)
-            .setTimestamp();
-
-          await msg.edit({ embeds: [endedEmbed], components: [] });
-          await interaction.followUp({ content: `🎊 Congratulations ${winners.map(w => `@${w}`).join(', ')}! You won **${prize}**!` });
-        } catch (err) {
-          console.error('Giveaway timer error:', err);
-        }
-      }, durationMinutes * 60 * 1000);
-    }
-
-    else if (commandName === 'poll') {
-      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
-        return interaction.reply({ content: '❌ Administrator permission required.', ephemeral: true });
-      }
-
-      const question = interaction.options.getString('question');
-      const opt1 = interaction.options.getString('option1');
-      const opt2 = interaction.options.getString('option2');
-      const pollId = `poll_${Date.now()}`;
-
-      await fetch(`https://donate-modded-2b27d-default-rtdb.firebaseio.com/Polls/${pollId}.json`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question, opt1, opt2, votes1: 0, votes2: 0, voters: {} })
-      });
-
-      const btn1 = new ButtonBuilder().setCustomId(`vote_${pollId}_1`).setLabel(opt1).setStyle(ButtonStyle.Primary);
-      const btn2 = new ButtonBuilder().setCustomId(`vote_${pollId}_2`).setLabel(opt2).setStyle(ButtonStyle.Secondary);
-      const row = new ActionRowBuilder().addComponents(btn1, btn2);
-
-      const embed = new EmbedBuilder()
-        .setColor('#3498db')
-        .setTitle('📊 COMMUNITY VOTE / POLL')
-        .setDescription(`**${question}**\n\n🟢 **[1]** ${opt1} (0 votes)\n🔵 **[2]** ${opt2} (0 votes)`)
-        .setFooter({ text: `Poll ID: ${pollId}` })
-        .setTimestamp();
-
-      await interaction.reply({ embeds: [embed], components: [row] });
     }
   } catch (error) {
     console.error('Error handling command:', error);
