@@ -37,7 +37,7 @@ const commands = [
     .addStringOption(option => option.setName('message').setDescription('The message to send').setRequired(true)),
 
   new SlashCommandBuilder()
-    .setName('dmID')
+    .setName('dmid')
     .setDescription('Sends a custom message to any user by their User ID (even if not in server)')
     .addStringOption(option => option.setName('userid').setDescription('The User ID of the person to message').setRequired(true))
     .addStringOption(option => option.setName('message').setDescription('The message to send').setRequired(true)),
@@ -115,8 +115,22 @@ const commands = [
     .setDescription('Check player donation stats from the game')
     .addStringOption(option => 
       option.setName('username')
-        .setDescription('Roblox username to lookup')
+        .setDescription('Roblox username or User ID to lookup')
         .setRequired(true)
+    ),
+
+  new SlashCommandBuilder()
+    .setName('leaderboard')
+    .setDescription('Displays the top 10 player donation leaderboard from the game')
+    .addStringOption(option =>
+      option.setName('category')
+        .setDescription('Choose which stat to rank by')
+        .setRequired(true)
+        .addChoices(
+          { name: 'Donated', value: 'Donated' },
+          { name: 'Raised', value: 'Raised' },
+          { name: 'Giftbux', value: 'Giftbux' }
+        )
     )
 ].map(command => command.toJSON());
 
@@ -473,8 +487,7 @@ client.on('interactionCreate', async interaction => {
     else if (commandName === 'say') {
       const messageText = interaction.options.getString('message');
 
-      await interaction.reply({ content: 'Message sent successfully!', ephemeral: true });
-      await interaction.channel.send({ content: messageText });
+      await interaction.reply({ content: messageText });
     }
 
     else if (commandName === 'gamestats') {
@@ -492,7 +505,6 @@ client.on('interactionCreate', async interaction => {
 
         const game = data.data[0];
 
-        // Fetch Game Icon/Thumbnail to show on the embed
         const iconRes = await fetch(`https://thumbnails.roblox.com/v1/games/icons?universeIds=${universeId}&returnPolicy=PlaceHolder&size=512x512&format=Png&isCircular=false`);
         const iconData = await iconRes.json();
         const gameIconUrl = iconData.data?.[0]?.imageUrl || 'https://images.rbxcdn.com/39322bc627582b13fa2592fa44a5359a';
@@ -533,40 +545,49 @@ client.on('interactionCreate', async interaction => {
 
     else if (commandName === 'stats') {
       await interaction.deferReply();
-      const username = interaction.options.getString('username');
+      const input = interaction.options.getString('username').trim();
 
       try {
-        // 1. Get Roblox User ID from username
-        const userRes = await fetch('https://users.roblox.com/v1/users/search', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ keyword: username, limit: 1 })
-        });
-        const userData = await userRes.json();
+        let userId;
+        let displayName;
 
-        if (!userData.data || userData.data.length === 0) {
-          return interaction.editReply({ content: `❌ Could not find a Roblox user with the name **${username}**.` });
+        // Check if input is a pure numeric User ID or a Username
+        if (/^\d+$/.test(input)) {
+          userId = input;
+          const userRes = await fetch(`https://users.roblox.com/v1/users/${userId}`);
+          const userData = await userRes.json();
+          if (!userData || userData.errors) {
+            return interaction.editReply({ content: `❌ Could not find a Roblox user with the ID **${input}**.` });
+          }
+          displayName = userData.displayName || userData.name;
+        } else {
+          const userRes = await fetch('https://users.roblox.com/v1/users/search', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ keyword: input, limit: 1 })
+          });
+          const userData = await userRes.json();
+
+          if (!userData.data || userData.data.length === 0) {
+            return interaction.editReply({ content: `❌ Could not find a Roblox user with the name **${input}**.` });
+          }
+
+          const robloxUser = userData.data[0];
+          userId = robloxUser.id.toString();
+          displayName = robloxUser.displayName;
         }
 
-        const robloxUser = userData.data[0];
-        const userId = robloxUser.id.toString();
-        const displayName = robloxUser.displayName;
-
-        // 2. Get Roblox Avatar Thumbnail
         const thumbRes = await fetch(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${userId}&size=150x150&format=Png&isCircular=false`);
         const thumbData = await thumbRes.json();
         const avatarUrl = thumbData.data?.[0]?.imageUrl || 'https://images.rbxcdn.com/39322bc627582b13fa2592fa44a5359a';
 
-        // 3. Fetch stats directly from your Firebase Realtime Database
         const firebaseRes = await fetch(`https://donate-modded-2b27d-default-rtdb.firebaseio.com/players/${userId}.json`);
         const statsData = await firebaseRes.json();
 
-        // Pull exact keys from your Firebase tree matching your exact layout
         const donated = statsData?.Donated !== undefined ? Number(statsData.Donated).toLocaleString() : "0";
         const raised = statsData?.Raised !== undefined ? Number(statsData.Raised).toLocaleString() : "0";
         const giftbux = statsData?.Giftbux !== undefined ? Number(statsData.Giftbux).toLocaleString() : "0";
 
-        // 4. Build and send the Discord Embed matching your exact visual requirement
         const statsEmbed = new EmbedBuilder()
           .setColor('#2b2d31')
           .setAuthor({ name: 'Puataun Utility', iconURL: 'https://images.rbxcdn.com/39322bc627582b13fa2592fa44a5359a' })
@@ -584,6 +605,71 @@ client.on('interactionCreate', async interaction => {
       } catch (error) {
         console.error('Failed to fetch player stats:', error);
         await interaction.editReply({ content: '❌ Failed to fetch player statistics from Firebase/Roblox.' });
+      }
+    }
+
+    else if (commandName === 'leaderboard') {
+      await interaction.deferReply();
+      const category = interaction.options.getString('category');
+
+      try {
+        const firebaseRes = await fetch('https://donate-modded-2b27d-default-rtdb.firebaseio.com/players.json');
+        const playersData = await firebaseRes.json();
+
+        if (!playersData) {
+          return interaction.editReply({ content: '❌ No player data found in Firebase yet!' });
+        }
+
+        const playerArray = Object.keys(playersData).map(userId => {
+          return {
+            userId: userId,
+            ...playersData[userId]
+          };
+        });
+
+        playerArray.sort((a, b) => {
+          const valA = Number(a[category]) || 0;
+          const valB = Number(b[category]) || 0;
+          return valB - valA;
+        });
+
+        const topPlayers = playerArray.slice(0, 10);
+
+        if (topPlayers.length === 0) {
+          return interaction.editReply({ content: '❌ Not enough player data to build a leaderboard.' });
+        }
+
+        const descriptions = [];
+        for (let i = 0; i < topPlayers.length; i++) {
+          const player = topPlayers[i];
+          const rankEmoji = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `\`#${i + 1}\``;
+          
+          let username = `User ID: ${player.userId}`;
+          try {
+            const userRes = await fetch(`https://users.roblox.com/v1/users/${player.userId}`);
+            const userData = await userRes.json();
+            if (userData && userData.name) {
+              username = `**${userData.displayName || userData.name}** (\`@${userData.name}\`)`;
+            }
+          } catch (e) {
+            // Fallback to User ID if API fails
+          }
+
+          const statValue = Number(player[category] || 0).toLocaleString();
+          descriptions.push(`${rankEmoji} ${username} — **${statValue}**`);
+        }
+
+        const leaderboardEmbed = new EmbedBuilder()
+          .setColor('#ffd700')
+          .setTitle(`🏆 TOP 10 ${category.toUpperCase()} LEADERBOARD`)
+          .setDescription(descriptions.join('\n\n'))
+          .setFooter({ text: `Requested by ${interaction.user.tag}` })
+          .setTimestamp();
+
+        await interaction.editReply({ embeds: [leaderboardEmbed] });
+      } catch (error) {
+        console.error('Failed to generate leaderboard:', error);
+        await interaction.editReply({ content: '❌ Failed to fetch leaderboard data from Firebase.' });
       }
     }
   } catch (error) {
@@ -618,6 +704,8 @@ client.on('interactionCreate', async interaction => {
           { id: client.user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] },
         ],
       });
+
+fn = async () => {};
 
       await interaction.editReply({ content: `✅ Your ticket has been created! Head over to ${ticketChannel}` });
 
