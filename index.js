@@ -46,7 +46,6 @@ async function getRobloxUserId(input) {
   const userData = await userRes.json();
 
   if (userData.data && userData.data.length > 0) {
-    // Exact or close match search fallback
     const exactMatch = userData.data.find(u => 
       u.name.toLowerCase() === input.toLowerCase() || 
       u.displayName.toLowerCase() === input.toLowerCase()
@@ -223,7 +222,28 @@ const commands = [
   new SlashCommandBuilder()
     .setName('removetitle')
     .setDescription('Removes the custom in-game title or badge from a player')
-    .addStringOption(option => option.setName('player').setDescription('Roblox User ID, Username, or Nickname').setRequired(true))
+    .addStringOption(option => option.setName('player').setDescription('Roblox User ID, Username, or Nickname').setRequired(true)),
+
+  new SlashCommandBuilder()
+    .setName('syncban')
+    .setDescription('Globally bans a user from both Discord and the Roblox game')
+    .addUserOption(option => option.setName('target').setDescription('Discord user to ban').setRequired(true))
+    .addStringOption(option => option.setName('robloxid').setDescription('Roblox User ID to blacklist').setRequired(true))
+    .addStringOption(option => option.setName('reason').setDescription('Reason for global ban').setRequired(false)),
+
+  new SlashCommandBuilder()
+    .setName('giveaway')
+    .setDescription('Host an epic game giveaway')
+    .addStringOption(option => option.setName('prize').setDescription('What are you giving away? (e.g. 5,000 Robux)').setRequired(true))
+    .addIntegerOption(option => option.setName('winners').setDescription('Number of winners').setRequired(true))
+    .addIntegerOption(option => option.setName('duration').setDescription('Duration in minutes').setRequired(true)),
+
+  new SlashCommandBuilder()
+    .setName('poll')
+    .setDescription('Create a live voting poll synced with Firebase telemetry')
+    .addStringOption(option => option.setName('question').setDescription('The question you want to ask').setRequired(true))
+    .addStringOption(option => option.setName('option1').setDescription('First choice').setRequired(true))
+    .addStringOption(option => option.setName('option2').setDescription('Second choice').setRequired(true))
 ].map(command => command.toJSON());
 
 client.once('ready', async () => {
@@ -277,7 +297,7 @@ client.on('guildMemberAdd', async member => {
   await welcomeChannel.send({ embeds: [welcomeEmbed] });
 });
 
-// Auto-Moderation & Prefix Commands System (Polls & Giveaways)
+// Auto-Moderation & Message Event Handlers
 const badWords = ['badword1', 'badword2', 'scamlink.com'];
 
 client.on('messageCreate', async message => {
@@ -301,63 +321,7 @@ client.on('messageCreate', async message => {
     }
   }
 
-  // 2. Poll System (!poll)
-  if (message.content.startsWith('!poll ')) {
-    const pollQuery = message.content.slice(6);
-    if (!pollQuery) return message.reply('Please provide a question for the poll!');
-
-    const pollEmbed = new EmbedBuilder()
-      .setColor('#5200ff')
-      .setTitle('📊 Community Poll')
-      .setDescription(pollQuery)
-      .setFooter({ text: `Poll started by ${message.author.tag}` })
-      .setTimestamp();
-
-    const pollMessage = await message.channel.send({ embeds: [pollEmbed] });
-    await pollMessage.react('👍');
-    await pollMessage.react('👎');
-    await message.delete().catch(() => {});
-  }
-
-  // 3. Giveaway System (!giveaway)
-  if (message.content.startsWith('!giveaway ')) {
-    const args = message.content.slice(10).split(' ');
-    const prize = args.join(' ');
-
-    if (!prize) return message.reply('Usage: `!giveaway [prize name]`');
-
-    const giveawayEmbed = new EmbedBuilder()
-      .setColor('#ffd700')
-      .setTitle('🎉 GIVEAWAY TIME! 🎉')
-      .setDescription(`Prize: **${prize}**\nReact with 🎉 to enter!\nHosted by: ${message.author}`)
-      .setTimestamp();
-
-    const gMessage = await message.channel.send({ embeds: [giveawayEmbed] });
-    await gMessage.react('🎉');
-
-    setTimeout(async () => {
-      try {
-        const fetchedMsg = await message.channel.messages.fetch(gMessage.id);
-        const reaction = fetchedMsg.reactions.cache.get('🎉');
-
-        if (!reaction) return message.channel.send('Giveaway ended with no reactions.');
-
-        const users = await reaction.users.fetch();
-        const entrants = users.filter(user => !user.bot);
-
-        if (entrants.size === 0) {
-          return message.channel.send(`Giveaway for **${prize}** ended, but no valid entries were found!`);
-        }
-
-        const winner = entrants.random();
-        message.channel.send(`🎊 Congratulations ${winner}! You won the **${prize}**!`);
-      } catch (err) {
-        console.error('Giveaway error:', err);
-      }
-    }, 60000);
-  }
-
-  // 4. DM Forwarding to Log Channel
+  // 2. DM Forwarding to Log Channel
   if (!message.guild) {
     const logChannelId = '1430151280092905666'; 
     const logChannel = client.channels.cache.get(logChannelId);
@@ -375,8 +339,76 @@ client.on('messageCreate', async message => {
   }
 });
 
-// Handle Slash Command Interactions
+// Handle Slash Command & Button/Poll Interactions
 client.on('interactionCreate', async interaction => {
+  // Handle Button / Interactive Component Clicks
+  if (interaction.isButton()) {
+    const customId = interaction.customId;
+
+    // A. Giveaway Entry Button Handler
+    if (customId.startsWith('enter_gw_')) {
+      const giveawayId = customId.replace('enter_gw_', '');
+      const userRef = `https://donate-modded-2b27d-default-rtdb.firebaseio.com/ActiveGiveaways/${giveawayId}/participants/${interaction.user.id}.json`;
+      
+      const checkRes = await fetch(userRef);
+      const joined = await checkRes.json();
+
+      if (joined) {
+        return interaction.reply({ content: '⚠️ You are already entered into this giveaway!', ephemeral: true });
+      }
+
+      await fetch(userRef, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: interaction.user.tag, timestamp: Date.now() })
+      });
+
+      return interaction.reply({ content: `✅ **Entry Confirmed!** You are officially entered to win!`, ephemeral: true });
+    }
+
+    // B. Poll Voting Button Handler
+    if (customId.startsWith('vote_')) {
+      const parts = customId.split('_');
+      const pollId = parts[1];
+      const optionNum = parts[2]; // '1' or '2'
+
+      const pollRef = `https://donate-modded-2b27d-default-rtdb.firebaseio.com/Polls/${pollId}.json`;
+      const res = await fetch(pollRef);
+      const pollData = await res.json();
+
+      if (!pollData) {
+        return interaction.reply({ content: '❌ This poll no longer exists.', ephemeral: true });
+      }
+
+      if (pollData.voters && pollData.voters[interaction.user.id]) {
+        return interaction.reply({ content: '⚠️ You have already voted in this poll!', ephemeral: true });
+      }
+
+      // Update vote counts and track voter
+      const updatedVoters = pollData.voters || {};
+      updatedVoters[interaction.user.id] = optionNum;
+
+      let v1 = pollData.votes1 || 0;
+      let v2 = pollData.votes2 || 0;
+      if (optionNum === '1') v1++;
+      if (optionNum === '2') v2++;
+
+      await fetch(pollRef, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ votes1: v1, votes2: v2, voters: updatedVoters })
+      });
+
+      // Update embed UI dynamically
+      const updatedEmbed = EmbedBuilder.from(interaction.message.embeds[0])
+        .setDescription(`**${pollData.question}**\n\n🟢 **[1]** ${pollData.opt1} (${v1} votes)\n🔵 **[2]** ${pollData.opt2} (${v2} votes)`);
+
+      await interaction.message.edit({ embeds: [updatedEmbed] });
+      return interaction.reply({ content: `✅ Successfully voted for option **${optionNum === '1' ? pollData.opt1 : pollData.opt2}**!`, ephemeral: true });
+    }
+    return;
+  }
+
   if (!interaction.isChatInputCommand()) return;
 
   const { commandName } = interaction;
@@ -962,6 +994,142 @@ client.on('interactionCreate', async interaction => {
         console.error('Failed to remove title from Firebase:', error);
         await interaction.editReply({ content: '❌ Failed to remove custom title from Firebase.' });
       }
+    }
+
+    else if (commandName === 'syncban') {
+      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+        return interaction.reply({ content: '❌ Administrator permission required.', ephemeral: true });
+      }
+
+      await interaction.deferReply();
+      const discordUser = interaction.options.getUser('target');
+      const robloxId = interaction.options.getString('robloxid');
+      const reason = interaction.options.getString('reason') || 'No reason provided';
+
+      try {
+        await interaction.guild.members.ban(discordUser.id, { reason: reason });
+      } catch (e) {
+        console.log('Failed to ban from Discord server: ' + e);
+      }
+
+      await fetch(`https://donate-modded-2b27d-default-rtdb.firebaseio.com/BannedPlayers/${robloxId}.json`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          bannedBy: interaction.user.tag,
+          reason: reason,
+          timestamp: Date.now(),
+          discordId: discordUser.id
+        })
+      });
+
+      const banEmbed = new EmbedBuilder()
+        .setColor('#ff0000')
+        .setTitle('🚨 GLOBAL SECURITY BAN EXECUTED')
+        .setDescription(`The hammer has dropped. User has been eradicated across all platforms.`)
+        .addFields(
+          { name: 'Discord User', value: `${discordUser.tag} (${discordUser.id})`, inline: true },
+          { name: 'Roblox ID', value: `${robloxId}`, inline: true },
+          { name: 'Reason', value: reason, inline: false }
+        )
+        .setTimestamp();
+
+      await interaction.editReply({ embeds: [banEmbed] });
+    }
+
+    else if (commandName === 'giveaway') {
+      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+        return interaction.reply({ content: '❌ Administrator permission required.', ephemeral: true });
+      }
+
+      const prize = interaction.options.getString('prize');
+      const winnerCount = interaction.options.getInteger('winners');
+      const durationMinutes = interaction.options.getInteger('duration');
+      const endTime = Date.now() + (durationMinutes * 60 * 1000);
+      const giveawayId = `gw_${Date.now()}`;
+
+      await fetch(`https://donate-modded-2b27d-default-rtdb.firebaseio.com/ActiveGiveaways/${giveawayId}.json`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prize, participants: {}, status: 'active', endTime })
+      });
+
+      const enterButton = new ButtonBuilder()
+        .setCustomId(`enter_gw_${giveawayId}`)
+        .setLabel('🎉 ENTER GIVEAWAY')
+        .setStyle(ButtonStyle.Success);
+
+      const row = new ActionRowBuilder().addComponents(enterButton);
+
+      const embed = new EmbedBuilder()
+        .setColor('#00ffcc')
+        .setTitle('🎉 EPIC GAME GIVEAWAY 🎉')
+        .setDescription(`Prize: **${prize}**\nWinners: **${winnerCount}**\nEnds: <t:${Math.floor(endTime / 1000)}:R>\n\nClick the button below to secure your entry!`)
+        .setFooter({ text: `Hosted by ${interaction.user.tag}` })
+        .setTimestamp(endTime);
+
+      const msg = await interaction.reply({ embeds: [embed], components: [row], fetchReply: true });
+
+      setTimeout(async () => {
+        try {
+          const res = await fetch(`https://donate-modded-2b27d-default-rtdb.firebaseio.com/ActiveGiveaways/${giveawayId}/participants.json`);
+          const participantsObj = await res.json();
+
+          if (!participantsObj) {
+            return msg.edit({ content: `❌ Giveaway for **${prize}** ended, but nobody entered!`, embeds: [], components: [] });
+          }
+
+          const userIds = Object.keys(participantsObj);
+          const winners = [];
+
+          for (let i = 0; i < Math.min(winnerCount, userIds.length); i++) {
+            const randomIndex = Math.floor(Math.random() * userIds.length);
+            winners.push(participantsObj[userIds[randomIndex]].username);
+            userIds.splice(randomIndex, 1);
+          }
+
+          const endedEmbed = new EmbedBuilder()
+            .setColor('#ff007f')
+            .setTitle('🎉 GIVEAWAY CONCLUDED 🎉')
+            .setDescription(`Prize: **${prize}**\n\n👑 **Winner(s):**\n${winners.map(w => `• ${w}`).join('\n')}`)
+            .setTimestamp();
+
+          await msg.edit({ embeds: [endedEmbed], components: [] });
+          await interaction.followUp({ content: `🎊 Congratulations ${winners.map(w => `@${w}`).join(', ')}! You won **${prize}**!` });
+        } catch (err) {
+          console.error('Giveaway timer error:', err);
+        }
+      }, durationMinutes * 60 * 1000);
+    }
+
+    else if (commandName === 'poll') {
+      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+        return interaction.reply({ content: '❌ Administrator permission required.', ephemeral: true });
+      }
+
+      const question = interaction.options.getString('question');
+      const opt1 = interaction.options.getString('option1');
+      const opt2 = interaction.options.getString('option2');
+      const pollId = `poll_${Date.now()}`;
+
+      await fetch(`https://donate-modded-2b27d-default-rtdb.firebaseio.com/Polls/${pollId}.json`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question, opt1, opt2, votes1: 0, votes2: 0, voters: {} })
+      });
+
+      const btn1 = new ButtonBuilder().setCustomId(`vote_${pollId}_1`).setLabel(opt1).setStyle(ButtonStyle.Primary);
+      const btn2 = new ButtonBuilder().setCustomId(`vote_${pollId}_2`).setLabel(opt2).setStyle(ButtonStyle.Secondary);
+      const row = new ActionRowBuilder().addComponents(btn1, btn2);
+
+      const embed = new EmbedBuilder()
+        .setColor('#3498db')
+        .setTitle('📊 COMMUNITY VOTE / POLL')
+        .setDescription(`**${question}**\n\n🟢 **[1]** ${opt1} (0 votes)\n🔵 **[2]** ${opt2} (0 votes)`)
+        .setFooter({ text: `Poll ID: ${pollId}` })
+        .setTimestamp();
+
+      await interaction.reply({ embeds: [embed], components: [row] });
     }
   } catch (error) {
     console.error('Error handling command:', error);
