@@ -582,23 +582,29 @@ client.on('interactionCreate', async interaction => {
         const thumbData = await thumbRes.json();
         const avatarUrl = thumbData.data?.[0]?.imageUrl || 'https://images.rbxcdn.com/39322bc627582b13fa2592fa44a5359a';
 
-        const firebaseRes = await fetch(`https://donate-modded-2b27d-default-rtdb.firebaseio.com/players/${userId}.json`);
-        const statsData = await firebaseRes.json();
+        // Check both paths: 'players/{userId}' and root '{userId}'
+        let firebaseRes = await fetch(`https://donate-modded-2b27d-default-rtdb.firebaseio.com/players/${userId}.json`);
+        let statsData = await firebaseRes.json();
 
-        const donated = statsData?.Donated !== undefined ? Number(statsData.Donated).toLocaleString() : "0";
-        const raised = statsData?.Raised !== undefined ? Number(statsData.Raised).toLocaleString() : "0";
-        const giftbux = statsData?.Giftbux !== undefined ? Number(statsData.Giftbux).toLocaleString() : "0";
-        const robux = statsData?.Robux !== undefined ? Number(statsData.Robux).toLocaleString() : "0";
+        if (!statsData) {
+          firebaseRes = await fetch(`https://donate-modded-2b27d-default-rtdb.firebaseio.com/${userId}.json`);
+          statsData = await firebaseRes.json();
+        }
+
+        const donated = statsData?.Donated ?? statsData?.donated ?? 0;
+        const raised = statsData?.Raised ?? statsData?.raised ?? 0;
+        const giftbux = statsData?.Giftbux ?? statsData?.giftbux ?? 0;
+        const robux = statsData?.Robux ?? statsData?.robux ?? 0;
 
         const statsEmbed = new EmbedBuilder()
           .setColor('#2b2d31')
           .setAuthor({ name: 'Puataun Utility', iconURL: 'https://images.rbxcdn.com/39322bc627582b13fa2592fa44a5359a' })
           .setTitle(`✨ ${displayName.toUpperCase()}'S STATS (PDZ)`)
           .setDescription(
-            `**Donated** 🌟\n${donated}\n\n` +
-            `**Raised** 🎀\n${raised}\n\n` +
-            `**Giftbux**\n${giftbux}\n\n` +
-            `**Robux** 💎\n${robux}`
+            `**Donated** 🌟\n${Number(donated).toLocaleString()}\n\n` +
+            `**Raised** 🎀\n${Number(raised).toLocaleString()}\n\n` +
+            `**Giftbux**\n${Number(giftbux).toLocaleString()}\n\n` +
+            `**Robux** 💎\n${Number(robux).toLocaleString()}`
           )
           .setThumbnail(avatarUrl)
           .setFooter({ text: `User ID: ${userId}` })
@@ -616,17 +622,26 @@ client.on('interactionCreate', async interaction => {
       const category = interaction.options.getString('category');
 
       try {
-        const firebaseRes = await fetch('https://donate-modded-2b27d-default-rtdb.firebaseio.com/players.json');
-        const playersData = await firebaseRes.json();
+        let firebaseRes = await fetch('https://donate-modded-2b27d-default-rtdb.firebaseio.com/players.json');
+        let playersData = await firebaseRes.json();
+
+        if (!playersData) {
+          firebaseRes = await fetch('https://donate-modded-2b27d-default-rtdb.firebaseio.com/.json');
+          playersData = await firebaseRes.json();
+        }
 
         if (!playersData) {
           return interaction.editReply({ content: '❌ No player data found in Firebase yet!' });
         }
 
         const playerArray = Object.keys(playersData).map(userId => {
+          const p = playersData[userId] || {};
           return {
             userId: userId,
-            ...playersData[userId]
+            Donated: p.Donated ?? p.donated ?? 0,
+            Raised: p.Raised ?? p.raised ?? 0,
+            Giftbux: p.Giftbux ?? p.giftbux ?? 0,
+            Robux: p.Robux ?? p.robux ?? 0
           };
         });
 
@@ -703,7 +718,7 @@ client.on('interactionCreate', async interaction => {
         type: ChannelType.GuildText,
         permissionOverwrites: [
           { id: guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
-          { id: member.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory] },
+          { id: member.id, allow: [PermissionsBitField.Flags.ViewChannel,PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory] },
           { id: client.user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] },
         ],
       });
@@ -746,4 +761,5 @@ client.on('interactionCreate', async interaction => {
   }
 });
 
+client.json = undefined;
 client.login(process.env.TOKEN);
