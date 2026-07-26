@@ -24,6 +24,43 @@ const client = new Client({
   ]
 });
 
+// Helper function to resolve Roblox User ID from ID, Username, or Display Name (Nickname)
+async function getRobloxUserId(input) {
+  input = input.trim();
+
+  // 1. If it's purely numbers, treat it as a User ID
+  if (/^\d+$/.test(input)) {
+    const userRes = await fetch(`https://users.roblox.com/v1/users/${input}`);
+    const userData = await userRes.json();
+    if (userData && !userData.errors) {
+      return { userId: input, displayName: userData.displayName || userData.name };
+    }
+  }
+
+  // 2. Search by keyword (Handles Usernames and Display Names/Nicknames)
+  const userRes = await fetch('https://users.roblox.com/v1/users/search', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ keyword: input, limit: 10 })
+  });
+  const userData = await userRes.json();
+
+  if (userData.data && userData.data.length > 0) {
+    // Exact or close match search fallback
+    const exactMatch = userData.data.find(u => 
+      u.name.toLowerCase() === input.toLowerCase() || 
+      u.displayName.toLowerCase() === input.toLowerCase()
+    ) || userData.data[0];
+
+    return { 
+      userId: exactMatch.id.toString(), 
+      displayName: exactMatch.displayName || exactMatch.name 
+    };
+  }
+
+  return null;
+}
+
 // Define Slash Commands
 const commands = [
   new SlashCommandBuilder()
@@ -114,8 +151,8 @@ const commands = [
     .setName('stats')
     .setDescription('Check player donation stats from the game')
     .addStringOption(option => 
-      option.setName('username')
-        .setDescription('Roblox username or User ID to lookup')
+      option.setName('player')
+        .setDescription('Roblox User ID, Username, or Nickname')
         .setRequired(true)
     ),
 
@@ -138,8 +175,8 @@ const commands = [
     .setName('resetstats')
     .setDescription('Resets a player specific stat or all stats in Firebase')
     .addStringOption(option =>
-      option.setName('username')
-        .setDescription('Roblox username or User ID to reset')
+      option.setName('player')
+        .setDescription('Roblox User ID, Username, or Nickname to reset')
         .setRequired(true)
     )
     .addStringOption(option =>
@@ -175,18 +212,18 @@ const commands = [
   new SlashCommandBuilder()
     .setName('deletecode')
     .setDescription('Deletes an existing game promo code from Firebase')
-    .addStringOption(option => option.setName('code').setDescription('The promo code to delete').setRequired(true))
+    .addStringOption(option => option.setName('code').setDescription('The promo code to delete').setRequired(true)),
     
   new SlashCommandBuilder()
     .setName('givetitle')
     .setDescription('Grants a custom in-game title or badge to a player')
-    .addStringOption(option => option.setName('username').setDescription('Roblox username or User ID').setRequired(true))
+    .addStringOption(option => option.setName('player').setDescription('Roblox User ID, Username, or Nickname').setRequired(true))
     .addStringOption(option => option.setName('title').setDescription('The custom title or badge name (e.g., VIP)').setRequired(true)),
 
   new SlashCommandBuilder()
     .setName('removetitle')
     .setDescription('Removes the custom in-game title or badge from a player')
-    .addStringOption(option => option.setName('username').setDescription('Roblox username or User ID').setRequired(true))
+    .addStringOption(option => option.setName('player').setDescription('Roblox User ID, Username, or Nickname').setRequired(true))
 ].map(command => command.toJSON());
 
 client.once('ready', async () => {
@@ -240,7 +277,7 @@ client.on('guildMemberAdd', async member => {
   await welcomeChannel.send({ embeds: [welcomeEmbed] });
 });
 
-// Auto-Moderation & Commands System (Polls & Giveaways)
+// Auto-Moderation & Prefix Commands System (Polls & Giveaways)
 const badWords = ['badword1', 'badword2', 'scamlink.com'];
 
 client.on('messageCreate', async message => {
@@ -616,36 +653,16 @@ client.on('interactionCreate', async interaction => {
 
     else if (commandName === 'stats') {
       await interaction.deferReply();
-      const input = interaction.options.getString('username').trim();
+      const input = interaction.options.getString('player');
 
       try {
-        let userId;
-        let displayName;
-
-        if (/^\d+$/.test(input)) {
-          userId = input;
-          const userRes = await fetch(`https://users.roblox.com/v1/users/${userId}`);
-          const userData = await userRes.json();
-          if (!userData || userData.errors) {
-            return interaction.editReply({ content: `❌ Could not find a Roblox user with the ID **${input}**.` });
-          }
-          displayName = userData.displayName || userData.name;
-        } else {
-          const userRes = await fetch('https://users.roblox.com/v1/users/search', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ keyword: input, limit: 1 })
-          });
-          const userData = await userRes.json();
-
-          if (!userData.data || userData.data.length === 0) {
-            return interaction.editReply({ content: `❌ Could not find a Roblox user with the name **${input}**.` });
-          }
-
-          const robloxUser = userData.data[0];
-          userId = robloxUser.id.toString();
-          displayName = robloxUser.displayName;
+        const resolvedUser = await getRobloxUserId(input);
+        if (!resolvedUser) {
+          return interaction.editReply({ content: `❌ Could not find a Roblox user matching **"${input}"** (try User ID, Username, or Nickname).` });
         }
+
+        const userId = resolvedUser.userId;
+        const displayName = resolvedUser.displayName;
 
         const thumbRes = await fetch(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${userId}&size=150x150&format=Png&isCircular=false`);
         const thumbData = await thumbRes.json();
@@ -655,7 +672,7 @@ client.on('interactionCreate', async interaction => {
         const statsData = await firebaseRes.json();
 
         if (!statsData) {
-          return interaction.editReply({ content: `❌ No stats found in the database for user ID \`${userId}\`.` });
+          return interaction.editReply({ content: `❌ No stats found in the database for **${displayName}** (ID: \`${userId}\`).` });
         }
 
         const donated = statsData.Donated ?? statsData.donated ?? 0;
@@ -772,37 +789,17 @@ client.on('interactionCreate', async interaction => {
       }
 
       await interaction.deferReply({ ephemeral: true });
-      const input = interaction.options.getString('username').trim();
+      const input = interaction.options.getString('player');
       const statChoice = interaction.options.getString('stat');
 
       try {
-        let userId;
-        let displayName;
-
-        if (/^\d+$/.test(input)) {
-          userId = input;
-          const userRes = await fetch(`https://users.roblox.com/v1/users/${userId}`);
-          const userData = await userRes.json();
-          if (!userData || userData.errors) {
-            return interaction.editReply({ content: `❌ Could not find a Roblox user with the ID **${input}**.` });
-          }
-          displayName = userData.displayName || userData.name;
-        } else {
-          const userRes = await fetch('https://users.roblox.com/v1/users/search', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ keyword: input, limit: 1 })
-          });
-          const userData = await userRes.json();
-
-          if (!userData.data || userData.data.length === 0) {
-            return interaction.editReply({ content: `❌ Could not find a Roblox user with the name **${input}**.` });
-          }
-
-          const robloxUser = userData.data[0];
-          userId = robloxUser.id.toString();
-          displayName = robloxUser.displayName;
+        const resolvedUser = await getRobloxUserId(input);
+        if (!resolvedUser) {
+          return interaction.editReply({ content: `❌ Could not find a Roblox user matching **"${input}"**.` });
         }
+
+        const userId = resolvedUser.userId;
+        const displayName = resolvedUser.displayName;
 
         const firebaseCheckRes = await fetch(`https://donate-modded-2b27d-default-rtdb.firebaseio.com/${userId}.json`);
         const existingData = await firebaseCheckRes.json();
@@ -902,39 +899,18 @@ client.on('interactionCreate', async interaction => {
       }
 
       await interaction.deferReply({ ephemeral: true });
-      const input = interaction.options.getString('username').trim();
+      const input = interaction.options.getString('player');
       const customTitle = interaction.options.getString('title');
 
       try {
-        let userId;
-        let displayName;
-
-        if (/^\d+$/.test(input)) {
-          userId = input;
-          const userRes = await fetch(`https://users.roblox.com/v1/users/${userId}`);
-          const userData = await userRes.json();
-          if (!userData || userData.errors) {
-            return interaction.editReply({ content: `❌ Could not find a Roblox user with the ID **${input}**.` });
-          }
-          displayName = userData.displayName || userData.name;
-        } else {
-          const userRes = await fetch('https://users.roblox.com/v1/users/search', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ keyword: input, limit: 1 })
-          });
-          const userData = await userRes.json();
-
-          if (!userData.data || userData.data.length === 0) {
-            return interaction.editReply({ content: `❌ Could not find a Roblox user with the name **${input}**.` });
-          }
-
-          const robloxUser = userData.data[0];
-          userId = robloxUser.id.toString();
-          displayName = robloxUser.displayName;
+        const resolvedUser = await getRobloxUserId(input);
+        if (!resolvedUser) {
+          return interaction.editReply({ content: `❌ Could not find a Roblox user matching **"${input}"**.` });
         }
 
-        // Saves title/badge directly to the player's Firebase node
+        const userId = resolvedUser.userId;
+        const displayName = resolvedUser.displayName;
+
         await fetch(`https://donate-modded-2b27d-default-rtdb.firebaseio.com/${userId}.json`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
@@ -960,38 +936,17 @@ client.on('interactionCreate', async interaction => {
       }
 
       await interaction.deferReply({ ephemeral: true });
-      const input = interaction.options.getString('username').trim();
+      const input = interaction.options.getString('player');
 
       try {
-        let userId;
-        let displayName;
-
-        if (/^\d+$/.test(input)) {
-          userId = input;
-          const userRes = await fetch(`https://users.roblox.com/v1/users/${userId}`);
-          const userData = await userRes.json();
-          if (!userData || userData.errors) {
-            return interaction.editReply({ content: `❌ Could not find a Roblox user with the ID **${input}**.` });
-          }
-          displayName = userData.displayName || userData.name;
-        } else {
-          const userRes = await fetch('https://users.roblox.com/v1/users/search', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ keyword: input, limit: 1 })
-          });
-          const userData = await userRes.json();
-
-          if (!userData.data || userData.data.length === 0) {
-            return interaction.editReply({ content: `❌ Could not find a Roblox user with the name **${input}**.` });
-          }
-
-          const robloxUser = userData.data[0];
-          userId = robloxUser.id.toString();
-          displayName = robloxUser.displayName;
+        const resolvedUser = await getRobloxUserId(input);
+        if (!resolvedUser) {
+          return interaction.editReply({ content: `❌ Could not find a Roblox user matching **"${input}"**.` });
         }
 
-        // Removes SpecialTitle from the player's Firebase node
+        const userId = resolvedUser.userId;
+        const displayName = resolvedUser.displayName;
+
         await fetch(`https://donate-modded-2b27d-default-rtdb.firebaseio.com/${userId}/SpecialTitle.json`, {
           method: 'DELETE'
         });
