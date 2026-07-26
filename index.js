@@ -129,7 +129,8 @@ const commands = [
         .addChoices(
           { name: 'Donated', value: 'Donated' },
           { name: 'Raised', value: 'Raised' },
-          { name: 'Giftbux', value: 'Giftbux' }
+          { name: 'Giftbux', value: 'Giftbux' },
+          { name: 'Robux', value: 'Robux' }
         )
     )
 ].map(command => command.toJSON());
@@ -587,6 +588,7 @@ client.on('interactionCreate', async interaction => {
         const donated = statsData?.Donated !== undefined ? Number(statsData.Donated).toLocaleString() : "0";
         const raised = statsData?.Raised !== undefined ? Number(statsData.Raised).toLocaleString() : "0";
         const giftbux = statsData?.Giftbux !== undefined ? Number(statsData.Giftbux).toLocaleString() : "0";
+        const robux = statsData?.Robux !== undefined ? Number(statsData.Robux).toLocaleString() : "0";
 
         const statsEmbed = new EmbedBuilder()
           .setColor('#2b2d31')
@@ -595,7 +597,8 @@ client.on('interactionCreate', async interaction => {
           .setDescription(
             `**Donated** 🌟\n${donated}\n\n` +
             `**Raised** 🎀\n${raised}\n\n` +
-            `**Giftbux**\n${giftbux}`
+            `**Giftbux**\n${giftbux}\n\n` +
+            `**Robux** 💎\n${robux}`
           )
           .setThumbnail(avatarUrl)
           .setFooter({ text: `User ID: ${userId}` })
@@ -704,8 +707,6 @@ client.on('interactionCreate', async interaction => {
           { id: client.user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] },
         ],
       });
-
-fn = async () => {};
 
       await interaction.editReply({ content: `✅ Your ticket has been created! Head over to ${ticketChannel}` });
 
