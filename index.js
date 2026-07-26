@@ -153,7 +153,7 @@ client.once('ready', async () => {
   }
 });
 
-// Welcomer System (Fixed with your specific Channel ID and image link)
+// Welcomer System
 client.on('guildMemberAdd', async member => {
   const welcomeChannelId = '1430173023201398874';
   const welcomeChannel = member.guild.channels.cache.get(welcomeChannelId);
@@ -668,6 +668,8 @@ client.on('interactionCreate', async interaction => {
         }
 
         const descriptions = [];
+        let firstPlaceUserId = null;
+
         for (let i = 0; i < topPlayers.length; i++) {
           const player = topPlayers[i];
           const rankEmoji = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `\`#${i + 1}\``;
@@ -683,14 +685,33 @@ client.on('interactionCreate', async interaction => {
             // Fallback
           }
 
+          if (i === 0) {
+            firstPlaceUserId = player.userId;
+          }
+
           const statValue = Number(player[category] || 0).toLocaleString();
           descriptions.push(`${rankEmoji} ${username} — **${statValue}**`);
+        }
+
+        // Fetch avatar for #1 user to display as the embed's thumbnail
+        let avatarUrl = 'https://images.rbxcdn.com/39322bc627582b13fa2592fa44a5359a';
+        if (firstPlaceUserId) {
+          try {
+            const thumbRes = await fetch(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${firstPlaceUserId}&size=150x150&format=Png&isCircular=false`);
+            const thumbData = await thumbRes.json();
+            if (thumbData.data?.[0]?.imageUrl) {
+              avatarUrl = thumbData.data[0].imageUrl;
+            }
+          } catch (e) {
+            // Fallback icon if fetch fails
+          }
         }
 
         const leaderboardEmbed = new EmbedBuilder()
           .setColor('#ffd700')
           .setTitle(`🏆 TOP 10 ${category.toUpperCase()} LEADERBOARD`)
           .setDescription(descriptions.join('\n\n'))
+          .setThumbnail(avatarUrl)
           .setFooter({ text: `Requested by ${interaction.user.tag}` })
           .setTimestamp();
 
