@@ -667,53 +667,45 @@ client.on('interactionCreate', async interaction => {
           return interaction.editReply({ content: '❌ Not enough player data to build a leaderboard.' });
         }
 
-        const descriptions = [];
-        let firstPlaceUserId = null;
+        const leaderboardEmbed = new EmbedBuilder()
+          .setColor('#ffd700')
+          .setTitle(`🏆 TOP 10 ${category.toUpperCase()} LEADERBOARD`)
+          .setFooter({ text: `Requested by ${interaction.user.tag}` })
+          .setTimestamp();
 
+        // Loop through each top player and fetch their avatar/username to add as individual fields
         for (let i = 0; i < topPlayers.length; i++) {
           const player = topPlayers[i];
           const rankEmoji = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `\`#${i + 1}\``;
           
           let username = `User ID: ${player.userId}`;
+          let avatarUrl = 'https://images.rbxcdn.com/39322bc627582b13fa2592fa44a5359a';
+
           try {
             const userRes = await fetch(`https://users.roblox.com/v1/users/${player.userId}`);
             const userData = await userRes.json();
             if (userData && userData.name) {
               username = `**${userData.displayName || userData.name}** (\`@${userData.name}\`)`;
             }
-          } catch (e) {
-            // Fallback
-          }
 
-          if (i === 0) {
-            firstPlaceUserId = player.userId;
-          }
-
-          const statValue = Number(player[category] || 0).toLocaleString();
-          descriptions.push(`${rankEmoji} ${username} — **${statValue}**`);
-        }
-
-        // Fetch avatar for #1 user to display as the embed's thumbnail
-        let avatarUrl = 'https://images.rbxcdn.com/39322bc627582b13fa2592fa44a5359a';
-        if (firstPlaceUserId) {
-          try {
-            const thumbRes = await fetch(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${firstPlaceUserId}&size=150x150&format=Png&isCircular=false`);
+            const thumbRes = await fetch(`https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${player.userId}&size=150x150&format=Png&isCircular=false`);
             const thumbData = await thumbRes.json();
             if (thumbData.data?.[0]?.imageUrl) {
               avatarUrl = thumbData.data[0].imageUrl;
             }
           } catch (e) {
-            // Fallback icon if fetch fails
+            // Fallback if API fails
           }
-        }
 
-        const leaderboardEmbed = new EmbedBuilder()
-          .setColor('#ffd700')
-          .setTitle(`🏆 TOP 10 ${category.toUpperCase()} LEADERBOARD`)
-          .setDescription(descriptions.join('\n\n'))
-          .setThumbnail(avatarUrl)
-          .setFooter({ text: `Requested by ${interaction.user.tag}` })
-          .setTimestamp();
+          const statValue = Number(player[category] || 0).toLocaleString();
+          
+          // Add a field for each player showing their avatar representation or details
+          leaderboardEmbed.addFields({
+            name: `${rankEmoji} Rank ${i + 1}`,
+            value: `👤 ${username}\n🖼️ [Avatar Link](${avatarUrl})\n📊 **${category}:** \`${statValue}\``,
+            inline: false
+          });
+        }
 
         await interaction.editReply({ embeds: [leaderboardEmbed] });
       } catch (error) {
