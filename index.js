@@ -24,8 +24,73 @@ const client = new Client({
   ]
 });
 
-// Define Slash Commands (Set to an empty array [] to clear all server commands. Put your commands back in here later!)
-const commands = [].map(command => command.toJSON());
+// Define Slash Commands
+const commands = [
+  new SlashCommandBuilder()
+    .setName('pong')
+    .setDescription('Replies with Ping!'),
+
+  new SlashCommandBuilder()
+    .setName('dm')
+    .setDescription('Sends a custom message to a user in their DMs')
+    .addUserOption(option => option.setName('user').setDescription('The user to message').setRequired(true))
+    .addStringOption(option => option.setName('message').setDescription('The message to send').setRequired(true)),
+
+  new SlashCommandBuilder()
+    .setName('ban')
+    .setDescription('Bans a member from the server')
+    .addUserOption(option => option.setName('user').setDescription('The user to ban').setRequired(true))
+    .addStringOption(option => option.setName('reason').setDescription('Reason for ban').setRequired(false)),
+
+  new SlashCommandBuilder()
+    .setName('unban')
+    .setDescription('Unbans a user by their User ID')
+    .addStringOption(option => option.setName('userid').setDescription('The ID of the user to unban').setRequired(true))
+    .addStringOption(option => option.setName('reason').setDescription('Reason for unban').setRequired(false)),
+
+  new SlashCommandBuilder()
+    .setName('kick')
+    .setDescription('Kicks a member from the server')
+    .addUserOption(option => option.setName('user').setDescription('The user to kick').setRequired(true))
+    .addStringOption(option => option.setName('reason').setDescription('Reason for kick').setRequired(false)),
+
+  new SlashCommandBuilder()
+    .setName('timeout')
+    .setDescription('Timeouts a member')
+    .addUserOption(option => option.setName('user').setDescription('The user to timeout').setRequired(true))
+    .addIntegerOption(option => option.setName('duration').setDescription('Duration in minutes').setRequired(true))
+    .addStringOption(option => option.setName('reason').setDescription('Reason for timeout').setRequired(false)),
+
+  new SlashCommandBuilder()
+    .setName('warn')
+    .setDescription('Issues a warning to a member')
+    .addUserOption(option => option.setName('user').setDescription('The user to warn').setRequired(true))
+    .addStringOption(option => option.setName('reason').setDescription('Reason for warning').setRequired(true)),
+
+  new SlashCommandBuilder()
+    .setName('clear')
+    .setDescription('Clears a specified number of messages from the channel')
+    .addIntegerOption(option => option.setName('amount').setDescription('Number of messages to delete (1-100)').setRequired(true)),
+
+  new SlashCommandBuilder()
+    .setName('announce')
+    .setDescription('Sends an announcement message to a specific channel')
+    .addChannelOption(option => option.setName('channel').setDescription('The channel to send the announcement to').setRequired(true))
+    .addStringOption(option => option.setName('message').setDescription('The announcement message').setRequired(true)),
+
+  new SlashCommandBuilder()
+    .setName('serverinfo')
+    .setDescription('Shows detailed and cool-looking information about the server'),
+
+  new SlashCommandBuilder()
+    .setName('userinfo')
+    .setDescription('Shows detailed information about a specific user')
+    .addUserOption(option => option.setName('user').setDescription('The user to inspect').setRequired(false)),
+
+  new SlashCommandBuilder()
+    .setName('ticketpanel')
+    .setDescription('Posts the ticket support portal panel')
+].map(command => command.toJSON());
 
 client.once('ready', async () => {
   console.log(`Logged in as ${client.user.tag}!`);
@@ -67,7 +132,7 @@ client.on('messageCreate', async message => {
   if (message.author.bot) return;
   if (message.guild) return; 
 
-  const logChannelId = '1430884502913155072'; 
+  const logChannelId = '1430151280092905666'; 
   const logChannel = client.channels.cache.get(logChannelId);
   
   if (!logChannel) return;
@@ -272,7 +337,8 @@ client.on('interactionCreate', async interaction => {
       const embed = new EmbedBuilder()
         .setColor('#7289da')
         .setTitle('Support Portal')
-        .setDescription('👋 **How can we help you today?**\n\nSelect the most relevant category from the menu below to open a ticket.\n\n**Note:** You can only have one active ticket at a time.');
+        .setDescription('👋 **How can we help you today?**\n\nSelect the most relevant category from the menu below to open a ticket.\n\n**Note:** You can only have one active ticket at a time.')
+        .setImage('https://media.discordapp.net/attachments/1430218552354537653/1530850147251130408/photo_10_2026-07-25_19-55-09.jpg?ex=6a6712cc&is=6a65c14c&hm=6ad0b410231f5c9c9c01fa6a6aa8c893eed91895687f93d93533e0b7c2c576b6&=&format=webp&width=1218&height=672');
 
       const row = new ActionRowBuilder().addComponents(
         new StringSelectMenuBuilder()
