@@ -153,17 +153,34 @@ client.once('ready', async () => {
   }
 });
 
-// Welcomer System
+// Welcomer System (Fixed with your specific Channel ID and image link)
 client.on('guildMemberAdd', async member => {
-  const welcomeChannel = member.guild.channels.cache.find(channel => channel.name === 'welcome' && channel.isTextBased());
+  const welcomeChannelId = '1430173023201398874';
+  const welcomeChannel = member.guild.channels.cache.get(welcomeChannelId);
   if (!welcomeChannel) return;
 
+  const rulesChannel = member.guild.channels.cache.find(c => c.name === 'rules' && c.isTextBased());
+  const ticketsChannel = member.guild.channels.cache.find(c => c.name === 'tickets' && c.isTextBased());
+
+  const rulesMention = rulesChannel ? `<#${rulesChannel.id}>` : '#rules';
+  const ticketsMention = ticketsChannel ? `<#${ticketsChannel.id}>` : '#tickets';
+
   const welcomeEmbed = new EmbedBuilder()
-    .setColor('#7289da')
-    .setTitle('👋 Welcome to the Server!')
-    .setDescription(`Hey ${member}, welcome to **${member.guild.name}**! We are thrilled to have you here. Make sure to check out the rules and enjoy your stay!`)
-    .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
-    .setImage('https://media.discordapp.net/attachments/1458034925793054730/1530870776670982194/combined_newtext_clean.png?ex=6a672603&is=6a65d483&hm=863e295e5ac0ac3058519ca063446f47c07c78f811ffebd5cf64341a2fa5bc42&=&format=webp&quality=lossless&width=1196&height=672')
+    .setColor('#ff3333')
+    .setDescription(
+      `welcome to [$] Puataun ! ${member}\n\n` +
+      `Here's a few things you can do in this server!\n\n` +
+      `📋 | **Read rules before starting a conversation!**\n` +
+      `📄 • ${rulesMention} — Click me to read rules!\n\n` +
+      `💌 | **This server is a helpful community dedicated on our games!**\n` +
+      `Plz Donate\n\n` +
+      `🗓️ | **Do not hesitate to ping a staff for any issues!**\n` +
+      `If its regarding bugs, staff report or anything else, Create an ticket!\n` +
+      `🎟️ • ${ticketsMention} — Click me to view support!\n\n` +
+      `🎗️ | **... And thats basically it!**\n` +
+      `Look around the server. You'll get it!`
+    )
+    .setImage('https://media.discordapp.net/attachments/1463872205950685371/1530934820727689316/photo_2026-07-25_19-17-15.jpg?ex=6a6761a8&is=6a661028&hm=e562563c4c8a7d40a77b66a17cf7a9ed4c20d211810bdb29d3f82c28a4ca5f6c&=&format=webp&width=1218&height=672')
     .setTimestamp();
 
   await welcomeChannel.send({ embeds: [welcomeEmbed] });
@@ -580,7 +597,6 @@ client.on('interactionCreate', async interaction => {
         const thumbData = await thumbRes.json();
         const avatarUrl = thumbData.data?.[0]?.imageUrl || 'https://images.rbxcdn.com/39322bc627582b13fa2592fa44a5359a';
 
-        // Direct fetch from root database path matching your Firebase tree structure
         const firebaseRes = await fetch(`https://donate-modded-2b27d-default-rtdb.firebaseio.com/${userId}.json`);
         const statsData = await firebaseRes.json();
 
@@ -619,7 +635,6 @@ client.on('interactionCreate', async interaction => {
       const category = interaction.options.getString('category');
 
       try {
-        // Fetch root database object where user IDs are keys
         const firebaseRes = await fetch('https://donate-modded-2b27d-default-rtdb.firebaseio.com/.json');
         const playersData = await firebaseRes.json();
 
@@ -665,7 +680,7 @@ client.on('interactionCreate', async interaction => {
               username = `**${userData.displayName || userData.name}** (\`@${userData.name}\`)`;
             }
           } catch (e) {
-            // Fallback to User ID if API fails
+            // Fallback
           }
 
           const statValue = Number(player[category] || 0).toLocaleString();
@@ -737,17 +752,6 @@ client.on('interactionCreate', async interaction => {
       console.error('Failed to create ticket channel:', error);
       await interaction.editReply({ content: '❌ Failed to create your ticket channel.' });
     }
-  } 
-  
-  else if (interaction.isButton() && interaction.customId === 'close_ticket') {
-    await interaction.reply({ content: '🔒 Closing this ticket in 5 seconds...' });
-    setTimeout(async () => {
-      try {
-        await interaction.channel.delete();
-      } catch (err) {
-        console.error('Failed to delete ticket channel:', err);
-      }
-    }, 5000);
   }
 });
 
