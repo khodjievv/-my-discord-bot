@@ -153,7 +153,40 @@ const commands = [
           { name: 'Giftbux', value: 'Giftbux' },
           { name: 'Robux', value: 'Robux' }
         )
-    )
+    ),
+
+  new SlashCommandBuilder()
+    .setName('createcode')
+    .setDescription('Creates a game promo code and saves it to Firebase')
+    .addStringOption(option => option.setName('code').setDescription('The promo code text (e.g., RELEASE)').setRequired(true))
+    .addIntegerOption(option => option.setName('reward').setDescription('The reward amount').setRequired(true))
+    .addStringOption(option =>
+      option.setName('type')
+        .setDescription('The currency/stat type for the reward')
+        .setRequired(true)
+        .addChoices(
+          { name: 'Donated', value: 'Donated' },
+          { name: 'Raised', value: 'Raised' },
+          { name: 'Giftbux', value: 'Giftbux' },
+          { name: 'Robux', value: 'Robux' }
+        )
+    ),
+
+  new SlashCommandBuilder()
+    .setName('deletecode')
+    .setDescription('Deletes an existing game promo code from Firebase')
+    .addStringOption(option => option.setName('code').setDescription('The promo code to delete').setRequired(true))
+    
+  new SlashCommandBuilder()
+    .setName('givetitle')
+    .setDescription('Grants a custom in-game title or badge to a player')
+    .addStringOption(option => option.setName('username').setDescription('Roblox username or User ID').setRequired(true))
+    .addStringOption(option => option.setName('title').setDescription('The custom title or badge name (e.g., VIP)').setRequired(true)),
+
+  new SlashCommandBuilder()
+    .setName('removetitle')
+    .setDescription('Removes the custom in-game title or badge from a player')
+    .addStringOption(option => option.setName('username').setDescription('Roblox username or User ID').setRequired(true))
 ].map(command => command.toJSON());
 
 client.once('ready', async () => {
@@ -804,6 +837,175 @@ client.on('interactionCreate', async interaction => {
       } catch (error) {
         console.error('Failed to reset stats in Firebase:', error);
         await interaction.editReply({ content: '❌ Failed to connect to Firebase to reset player stats.' });
+      }
+    }
+
+    else if (commandName === 'createcode') {
+      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+        return interaction.reply({ content: '❌ You need **Administrator** permissions to use this command.', ephemeral: true });
+      }
+
+      await interaction.deferReply({ ephemeral: true });
+      const code = interaction.options.getString('code').trim().toUpperCase();
+      const reward = interaction.options.getInteger('reward');
+      const type = interaction.options.getString('type');
+
+      try {
+        await fetch(`https://donate-modded-2b27d-default-rtdb.firebaseio.com/Codes/${code}.json`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reward: reward, type: type })
+        });
+
+        const codeEmbed = new EmbedBuilder()
+          .setColor('#57F287')
+          .setTitle('🎟️ Promo Code Created')
+          .setDescription(`Successfully created promo code **${code}**!\n\n🎁 **Reward:** \`${reward.toLocaleString()} ${type}\``)
+          .setTimestamp();
+
+        await interaction.editReply({ embeds: [codeEmbed] });
+      } catch (error) {
+        console.error('Failed to create code in Firebase:', error);
+        await interaction.editReply({ content: '❌ Failed to save promo code to Firebase.' });
+      }
+    }
+
+    else if (commandName === 'deletecode') {
+      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+        return interaction.reply({ content: '❌ You need **Administrator** permissions to use this command.', ephemeral: true });
+      }
+
+      await interaction.deferReply({ ephemeral: true });
+      const code = interaction.options.getString('code').trim().toUpperCase();
+
+      try {
+        await fetch(`https://donate-modded-2b27d-default-rtdb.firebaseio.com/Codes/${code}.json`, {
+          method: 'DELETE'
+        });
+
+        const codeEmbed = new EmbedBuilder()
+          .setColor('#ED4245')
+          .setTitle('🗑️ Promo Code Deleted')
+          .setDescription(`Successfully deleted promo code **${code}** from Firebase.`)
+          .setTimestamp();
+
+        await interaction.editReply({ embeds: [codeEmbed] });
+      } catch (error) {
+        console.error('Failed to delete code from Firebase:', error);
+        await interaction.editReply({ content: '❌ Failed to delete promo code from Firebase.' });
+      }
+    }
+
+    else if (commandName === 'givetitle') {
+      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+        return interaction.reply({ content: '❌ You need **Administrator** permissions to use this command.', ephemeral: true });
+      }
+
+      await interaction.deferReply({ ephemeral: true });
+      const input = interaction.options.getString('username').trim();
+      const customTitle = interaction.options.getString('title');
+
+      try {
+        let userId;
+        let displayName;
+
+        if (/^\d+$/.test(input)) {
+          userId = input;
+          const userRes = await fetch(`https://users.roblox.com/v1/users/${userId}`);
+          const userData = await userRes.json();
+          if (!userData || userData.errors) {
+            return interaction.editReply({ content: `❌ Could not find a Roblox user with the ID **${input}**.` });
+          }
+          displayName = userData.displayName || userData.name;
+        } else {
+          const userRes = await fetch('https://users.roblox.com/v1/users/search', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ keyword: input, limit: 1 })
+          });
+          const userData = await userRes.json();
+
+          if (!userData.data || userData.data.length === 0) {
+            return interaction.editReply({ content: `❌ Could not find a Roblox user with the name **${input}**.` });
+          }
+
+          const robloxUser = userData.data[0];
+          userId = robloxUser.id.toString();
+          displayName = robloxUser.displayName;
+        }
+
+        // Saves title/badge directly to the player's Firebase node
+        await fetch(`https://donate-modded-2b27d-default-rtdb.firebaseio.com/${userId}.json`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ SpecialTitle: customTitle })
+        });
+
+        const titleEmbed = new EmbedBuilder()
+          .setColor('#5865F2')
+          .setTitle('✨ In-Game Title Granted')
+          .setDescription(`Successfully granted the title **"${customTitle}"** to **${displayName}** (\`@${userId}\`).`)
+          .setTimestamp();
+
+        await interaction.editReply({ embeds: [titleEmbed] });
+      } catch (error) {
+        console.error('Failed to grant title in Firebase:', error);
+        await interaction.editReply({ content: '❌ Failed to save custom title to Firebase.' });
+      }
+    }
+
+    else if (commandName === 'removetitle') {
+      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+        return interaction.reply({ content: '❌ You need **Administrator** permissions to use this command.', ephemeral: true });
+      }
+
+      await interaction.deferReply({ ephemeral: true });
+      const input = interaction.options.getString('username').trim();
+
+      try {
+        let userId;
+        let displayName;
+
+        if (/^\d+$/.test(input)) {
+          userId = input;
+          const userRes = await fetch(`https://users.roblox.com/v1/users/${userId}`);
+          const userData = await userRes.json();
+          if (!userData || userData.errors) {
+            return interaction.editReply({ content: `❌ Could not find a Roblox user with the ID **${input}**.` });
+          }
+          displayName = userData.displayName || userData.name;
+        } else {
+          const userRes = await fetch('https://users.roblox.com/v1/users/search', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ keyword: input, limit: 1 })
+          });
+          const userData = await userRes.json();
+
+          if (!userData.data || userData.data.length === 0) {
+            return interaction.editReply({ content: `❌ Could not find a Roblox user with the name **${input}**.` });
+          }
+
+          const robloxUser = userData.data[0];
+          userId = robloxUser.id.toString();
+          displayName = robloxUser.displayName;
+        }
+
+        // Removes SpecialTitle from the player's Firebase node
+        await fetch(`https://donate-modded-2b27d-default-rtdb.firebaseio.com/${userId}/SpecialTitle.json`, {
+          method: 'DELETE'
+        });
+
+        const titleEmbed = new EmbedBuilder()
+          .setColor('#ED4245')
+          .setTitle('🗑️ In-Game Title Removed')
+          .setDescription(`Successfully removed the custom title from **${displayName}** (\`@${userId}\`).`)
+          .setTimestamp();
+
+        await interaction.editReply({ embeds: [titleEmbed] });
+      } catch (error) {
+        console.error('Failed to remove title from Firebase:', error);
+        await interaction.editReply({ content: '❌ Failed to remove custom title from Firebase.' });
       }
     }
   } catch (error) {
