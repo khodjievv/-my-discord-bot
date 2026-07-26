@@ -132,7 +132,7 @@ client.on('messageCreate', async message => {
   if (message.author.bot) return;
   if (message.guild) return; 
 
-  const logChannelId = '1430151280092905666'; 
+  const logChannelId = '1468122780183560262'; 
   const logChannel = client.channels.cache.get(logChannelId);
   
   if (!logChannel) return;
