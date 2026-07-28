@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, ChannelType, PermissionsBitField } = require('discord.js');
+const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, ChannelType, PermissionsBitField, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
 const express = require('express');
 
 // Express server for Render
@@ -339,7 +339,7 @@ client.on('messageCreate', async message => {
   }
 });
 
-// Handle Slash Command & Button/Poll Interactions
+// Handle Slash Command & Button/Poll/Modal Interactions
 client.on('interactionCreate', async interaction => {
   // Handle Button / Interactive Component Clicks
   if (interaction.isButton()) {
@@ -420,6 +420,84 @@ client.on('interactionCreate', async interaction => {
       return;
     }
 
+    // D. Ticket Creation Button Handler (from Modal or direct panel button if any)
+    if (customId === 'create_ticket') {
+      const modal = new ModalBuilder()
+        .setCustomId('user_support_modal')
+        .setTitle('User Support');
+
+      const descInput = new TextInputBuilder()
+        .setCustomId('help_description')
+        .setLabel('What do you need help with?')
+        .setPlaceholder('Be descriptive')
+        .setStyle(TextInputStyle.Paragraph)
+        .setRequired(true);
+
+      const issueInput = new TextInputBuilder()
+        .setCustomId('help_issue')
+        .setLabel('What is your issue/question?')
+        .setPlaceholder('Ask away!')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true);
+
+      modal.addComponents(
+        new ActionRowBuilder().addComponents(descInput),
+        new ActionRowBuilder().addComponents(issueInput)
+      );
+
+      return await interaction.showModal(modal);
+    }
+
+    return;
+  }
+
+  // Handle Modal Submissions
+  if (interaction.isModalSubmit()) {
+    if (interaction.customId === 'user_support_modal') {
+      const needHelpWith = interaction.fields.getTextInputValue('help_description');
+      const issueQuestion = interaction.fields.getTextInputValue('help_issue');
+
+      const guild = interaction.guild;
+      const member = interaction.member;
+
+      const existingChannel = guild.channels.cache.find(c => c.name === `ticket-${member.user.username.toLowerCase()}`);
+      if (existingChannel) {
+        return interaction.reply({ content: `❌ You already have an active ticket open here: ${existingChannel}`, ephemeral: true });
+      }
+
+      await interaction.deferReply({ ephemeral: true });
+
+      try {
+        const ticketChannel = await guild.channels.create({
+          name: `ticket-${member.user.username}`,
+          type: ChannelType.GuildText,
+          permissionOverwrites: [
+            { id: guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
+            { id: member.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory] },
+            { id: client.user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] },
+          ],
+        });
+
+        await interaction.editReply({ content: `✅ Your ticket has been created! Head over to ${ticketChannel}` });
+
+        const welcomeEmbed = new EmbedBuilder()
+          .setColor('#7289da')
+          .setTitle('Ticket: USER SUPPORT')
+          .setDescription(`Hello ${member}, thank you for reaching out.\n\n**Details:** ${needHelpWith}\n**Issue:** ${issueQuestion}\n\nA staff member will be with you shortly.`);
+
+        const closeButton = new ActionRowBuilder().addComponents(
+          new ButtonBuilder()
+            .setCustomId('close_ticket')
+            .setLabel('🔒 Close Ticket')
+            .setStyle(ButtonStyle.Danger)
+        );
+
+        await ticketChannel.send({ embeds: [welcomeEmbed], components: [closeButton] });
+      } catch (error) {
+        console.error('Failed to create ticket channel from modal:', error);
+        await interaction.editReply({ content: '❌ Failed to create your ticket channel.' });
+      }
+    }
     return;
   }
 
@@ -619,22 +697,26 @@ client.on('interactionCreate', async interaction => {
 
     else if (commandName === 'ticketpanel') {
       const embed = new EmbedBuilder()
-        .setColor('#7289da')
-        .setTitle('Support Portal')
-        .setDescription('👋 **How can we help you today?**\n\nSelect the most relevant category from the menu below to open a ticket.\n\n**Note:** You can only have one active ticket at a time.')
-        .setImage('https://media.discordapp.net/attachments/1530989819377881138/1531672789835190393/be52db3a-4dae-400e-a514-c2e1e40142f5.png?ex=6a6a10f2&is=6a68bf72&hm=a6961b00805a4b81c31a26e185c2712d863313a701c750c2674a0f5407ddca73&=&format=webp&quality=lossless&width=1218&height=672');
+        .setColor('#0099ff')
+        .setTitle('🎫 Need Assistance?')
+        .setDescription(
+            'Facing any trouble with the game or have questions about the server?\n' +
+            'Open a ticket below and our support team will assist you shortly!\n\n' +
+            '⚠️ *Please note that opening false or joke tickets violates community guidelines.*'
+        )
+        .setImage('https://media.discordapp.net/attachments/1530989819377881138/1531672789835190393/be52db3a-4dae-400e-a514-c2e1e40142f5.png?ex=6a6a10f2&is=6a68bf72&hm=a6961b00805a4b81c31a26e185c2712d863313a701c750c2674a0f5407ddca73&=&format=webp&quality=lossless&width=1218&height=672')
+        .setFooter({ 
+            text: '💰 Puataun’s Utilities' 
+        });
 
-      const row = new ActionRowBuilder().addComponents(
-        new StringSelectMenuBuilder()
-          .setCustomId('ticket_category_select')
-          .setPlaceholder('📁 Choose a category...')
-          .addOptions([
-            { label: 'General Inquiry', value: 'general_inquiry', emoji: '🛡️' },
-            { label: 'Player Reporting', value: 'player_reporting', emoji: '⛔' },
-            { label: 'Billing & Ranks', value: 'billing_ranks', emoji: '💰' },
-            { label: 'Bug Report', value: 'bug_report', emoji: '🐛' },
-          ]),
-      );
+      const row = new ActionRowBuilder()
+        .addComponents(
+            new ButtonBuilder()
+                .setCustomId('create_ticket')
+                .setLabel('Create ticket')
+                .setStyle(ButtonStyle.Primary)
+                .setEmoji('📥')
+        );
 
       await interaction.reply({ embeds: [embed], components: [row] });
     }
@@ -1153,52 +1235,4 @@ client.on('interactionCreate', async interaction => {
   }
 });
 
-// Handle Ticket Dropdown
-client.on('interactionCreate', async interaction => {
-  if (interaction.isStringSelectMenu() && interaction.customId === 'ticket_category_select') {
-    await interaction.deferReply({ ephemeral: true });
-
-    const categoryValue = interaction.values[0];
-    const guild = interaction.guild;
-    const member = interaction.member;
-
-    const existingChannel = guild.channels.cache.find(c => c.name === `ticket-${member.user.username.toLowerCase()}`);
-    if (existingChannel) {
-      return interaction.editReply({ content: `❌ You already have an active ticket open here: ${existingChannel}` });
-    }
-
-    try {
-      const ticketChannel = await guild.channels.create({
-        name: `ticket-${member.user.username}`,
-        type: ChannelType.GuildText,
-        permissionOverwrites: [
-          { id: guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
-          { id: member.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory] },
-          { id: client.user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] },
-        ],
-      });
-
-      await interaction.editReply({ content: `✅ Your ticket has been created! Head over to ${ticketChannel}` });
-
-      const welcomeEmbed = new EmbedBuilder()
-        .setColor('#7289da')
-        .setTitle(`Ticket: ${categoryValue.replace('_', ' ').toUpperCase()}`)
-        .setDescription(`Hello ${member}, thank you for reaching out.\n\nPlease describe your issue in detail, and a staff member will be with you shortly.`);
-
-      const closeButton = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-          .setCustomId('close_ticket')
-          .setLabel('🔒 Close Ticket')
-          .setStyle(ButtonStyle.Danger)
-      );
-
-      await ticketChannel.send({ embeds: [welcomeEmbed], components: [closeButton] });
-    } catch (error) {
-      console.error('Failed to create ticket channel:', error);
-      await interaction.editReply({ content: '❌ Failed to create your ticket channel.' });
-    }
-  }
-});
-
-client.login(process.env.TOKEN);
 client.login(process.env.TOKEN || process.env.TOKEN2);
