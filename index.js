@@ -391,7 +391,7 @@ client.on('messageCreate', async message => {
 // Handle Slash Command & Button/Poll Interactions
 client.on('interactionCreate', async interaction => {
   // Security Check: Enforce Role Restriction on all interactions
-  if (interaction.isGuildBased() && !interaction.member.roles.cache.has(TARGET_ROLE_ID)) {
+  if (interaction.inGuild() && !interaction.member.roles.cache.has(TARGET_ROLE_ID)) {
     if (interaction.isRepliable()) {
       return interaction.reply({ content: '❌ You do not have the required role to use this bot.', ephemeral: true });
     }
