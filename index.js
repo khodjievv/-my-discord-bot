@@ -60,101 +60,77 @@ async function getRobloxUserId(input) {
   return null;
 }
 
-// Define Slash Commands
-const commands = [
-  new SlashCommandBuilder()
-    .setName('pong')
-    .setDescription('Replies with Ping!'),
+// Define Slash Commands with Default Permission Restriction (Only Bot Perms / Role ID 1457974202798833811)
+const TARGET_ROLE_ID = '1457974202798833811';
 
+const commands = [
+  new SlashCommandBuilder().setName('pong').setDescription('Replies with Ping!'),
   new SlashCommandBuilder()
     .setName('dm')
     .setDescription('Sends a custom message to a server member')
     .addUserOption(option => option.setName('user').setDescription('The server member to message').setRequired(true))
     .addStringOption(option => option.setName('message').setDescription('The message to send').setRequired(true)),
-
   new SlashCommandBuilder()
     .setName('dmid')
     .setDescription('Sends a custom message to any user by their User ID (even if not in server)')
     .addStringOption(option => option.setName('userid').setDescription('The User ID of the person to message').setRequired(true))
     .addStringOption(option => option.setName('message').setDescription('The message to send').setRequired(true)),
-
   new SlashCommandBuilder()
     .setName('ban')
     .setDescription('Bans a member from the server')
     .addUserOption(option => option.setName('user').setDescription('The user to ban').setRequired(true))
     .addStringOption(option => option.setName('reason').setDescription('Reason for ban').setRequired(false)),
-
   new SlashCommandBuilder()
     .setName('unban')
     .setDescription('Unbans a user by their User ID')
     .addStringOption(option => option.setName('userid').setDescription('The ID of the user to unban').setRequired(true))
     .addStringOption(option => option.setName('reason').setDescription('Reason for unban').setRequired(false)),
-
   new SlashCommandBuilder()
     .setName('kick')
     .setDescription('Kicks a member from the server')
     .addUserOption(option => option.setName('user').setDescription('The user to kick').setRequired(true))
     .addStringOption(option => option.setName('reason').setDescription('Reason for kick').setRequired(false)),
-
   new SlashCommandBuilder()
     .setName('timeout')
     .setDescription('Timeouts a member')
     .addUserOption(option => option.setName('user').setDescription('The user to timeout').setRequired(true))
     .addIntegerOption(option => option.setName('duration').setDescription('Duration in minutes').setRequired(true))
     .addStringOption(option => option.setName('reason').setDescription('Reason for timeout').setRequired(false)),
-
   new SlashCommandBuilder()
     .setName('warn')
     .setDescription('Issues a warning to a member')
     .addUserOption(option => option.setName('user').setDescription('The user to warn').setRequired(true))
     .addStringOption(option => option.setName('reason').setDescription('Reason for warning').setRequired(true)),
-
   new SlashCommandBuilder()
     .setName('clear')
     .setDescription('Clears a specified number of messages from the channel')
     .addIntegerOption(option => option.setName('amount').setDescription('Number of messages to delete (1-100)').setRequired(true)),
-
   new SlashCommandBuilder()
     .setName('announce')
     .setDescription('Sends an announcement message to a specific channel')
     .addChannelOption(option => option.setName('channel').setDescription('The channel to send the announcement to').setRequired(true))
     .addStringOption(option => option.setName('message').setDescription('The announcement message').setRequired(true)),
-
   new SlashCommandBuilder()
     .setName('serverinfo')
     .setDescription('Shows detailed information about the server'),
-
   new SlashCommandBuilder()
     .setName('userinfo')
     .setDescription('Shows detailed information about a specific user')
     .addUserOption(option => option.setName('user').setDescription('The user to inspect').setRequired(false)),
-
   new SlashCommandBuilder()
     .setName('ticketpanel')
     .setDescription('Posts the ticket support portal panel'),
-
   new SlashCommandBuilder()
     .setName('say')
     .setDescription('Makes the bot say whatever you type')
-    .addStringOption(option => 
-      option.setName('message')
-        .setDescription('The message you want the bot to say')
-        .setRequired(true)
-    ),
-
+    .addStringOption(option => option.setName('message').setDescription('The message you want the bot to say').setRequired(true)),
   new SlashCommandBuilder()
     .setName('gamestats')
     .setDescription('Fetches and displays live stats from your Roblox game'),
-
   new SlashCommandBuilder()
     .setName('stats')
     .setDescription('Check player donation stats from the game')
-    .addStringOption(option => 
-      option.setName('player')
-        .setDescription('Roblox User ID, Username, or Nickname')
-        .setRequired(true)
-    ),
-
+    .addStringOption(option => option.setName('player').setDescription('Roblox User ID, Username, or Nickname').setRequired(true)),
   new SlashCommandBuilder()
     .setName('leaderboard')
     .setDescription('Displays the top 10 player donation leaderboard from the game')
@@ -169,15 +145,10 @@ const commands = [
           { name: 'Robux', value: 'Robux' }
         )
     ),
-
   new SlashCommandBuilder()
     .setName('resetstats')
     .setDescription('Resets a player specific stat or all stats in Firebase')
-    .addStringOption(option =>
-      option.setName('player')
-        .setDescription('Roblox User ID, Username, or Nickname to reset')
-        .setRequired(true)
-    )
+    .addStringOption(option => option.setName('player').setDescription('Roblox User ID, Username, or Nickname to reset').setRequired(true))
     .addStringOption(option =>
       option.setName('stat')
         .setDescription('Which stat to reset')
@@ -190,7 +161,6 @@ const commands = [
           { name: 'Robux', value: 'Robux' }
         )
     ),
-
   new SlashCommandBuilder()
     .setName('createcode')
     .setDescription('Creates a game promo code and saves it to Firebase')
@@ -207,58 +177,73 @@ const commands = [
           { name: 'Robux', value: 'Robux' }
         )
     ),
-
   new SlashCommandBuilder()
     .setName('deletecode')
     .setDescription('Deletes an existing game promo code from Firebase')
     .addStringOption(option => option.setName('code').setDescription('The promo code to delete').setRequired(true)),
-    
   new SlashCommandBuilder()
     .setName('givetitle')
     .setDescription('Grants a custom in-game title or badge to a player')
     .addStringOption(option => option.setName('player').setDescription('Roblox User ID, Username, or Nickname').setRequired(true))
     .addStringOption(option => option.setName('title').setDescription('The custom title or badge name (e.g., VIP)').setRequired(true)),
-
   new SlashCommandBuilder()
     .setName('removetitle')
     .setDescription('Removes the custom in-game title or badge from a player')
     .addStringOption(option => option.setName('player').setDescription('Roblox User ID, Username, or Nickname').setRequired(true)),
-
   new SlashCommandBuilder()
     .setName('syncban')
     .setDescription('Globally bans a user from both Discord and the Roblox game')
     .addUserOption(option => option.setName('target').setDescription('Discord user to ban').setRequired(true))
     .addStringOption(option => option.setName('robloxid').setDescription('Roblox User ID to blacklist').setRequired(true))
     .addStringOption(option => option.setName('reason').setDescription('Reason for global ban').setRequired(false)),
-
   new SlashCommandBuilder()
     .setName('giveaway')
     .setDescription('Host an epic game giveaway')
     .addStringOption(option => option.setName('prize').setDescription('What are you giving away? (e.g. 5,000 Robux)').setRequired(true))
     .addIntegerOption(option => option.setName('winners').setDescription('Number of winners').setRequired(true))
     .addIntegerOption(option => option.setName('duration').setDescription('Duration in minutes').setRequired(true)),
-
   new SlashCommandBuilder()
     .setName('poll')
     .setDescription('Create a live voting poll synced with Firebase telemetry')
     .addStringOption(option => option.setName('question').setDescription('The question you want to ask').setRequired(true))
     .addStringOption(option => option.setName('option1').setDescription('First choice').setRequired(true))
     .addStringOption(option => option.setName('option2').setDescription('Second choice').setRequired(true))
-].map(command => command.toJSON());
+].map(command => {
+  command.setDefaultMemberPermissions(PermissionFlagsBits.Administrator);
+  return command.toJSON();
+});
 
 client.once('ready', async () => {
-  console.log(`Logged in as ${client.user.tag}![cite: 3]`);
+  console.log(`Logged in as ${client.user.tag}!`);
 
   const GUILD_ID = '1430150908490027090';
   const rest = new REST({ version: '10' }).setToken(process.env.TOKEN || process.env.TOKEN2);
   
   try {
     console.log('Started refreshing guild (/) commands.');
-    await rest.put(
+    const registeredCommands = await rest.put(
       Routes.applicationGuildCommands(client.user.id, GUILD_ID),
       { body: commands },
     );
-    console.log('Successfully reloaded and updated guild (/) commands.');
+
+    // Apply strict permissions so that only members with role 1457974202798833811 can use these commands
+    const permissionsBody = registeredCommands.map(cmd => ({
+      id: cmd.id,
+      permissions: [
+        {
+          id: TARGET_ROLE_ID,
+          type: 1, // 1 = Role type
+          permission: true,
+        },
+      ],
+    }));
+
+    await rest.put(
+      Routes.guildApplicationCommandsPermissions(client.user.id, GUILD_ID),
+      { body: permissionsBody }
+    );
+
+    console.log('Successfully reloaded, updated commands, and enforced role permissions.');
   } catch (error) {
     console.error(error);
   }
@@ -339,13 +324,25 @@ client.on('messageCreate', async message => {
   }
 });
 
-// Handle Slash Command & Button/Poll Interactions
+// Unified Interaction Handler (Buttons, Select Menus, & Slash Commands)
 client.on('interactionCreate', async interaction => {
+  // Check if member has the allowed role or administrator permissions
+  if (interaction.isChatInputCommand() || interaction.isButton() || interaction.isStringSelectMenu()) {
+    if (interaction.inGuild() && !interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+      if (!interaction.member.roles.cache.has(TARGET_ROLE_ID)) {
+        // Allow ticket dropdown/close buttons to pass through for regular members if needed, 
+        // but restrict operational commands. Let's filter specifically for chat input commands:
+        if (interaction.isChatInputCommand()) {
+          return interaction.reply({ content: '❌ You do not have the required role to use this command.', ephemeral: true });
+        }
+      }
+    }
+  }
+
   // Handle Button / Interactive Component Clicks
   if (interaction.isButton()) {
     const customId = interaction.customId;
 
-    // A. Giveaway Entry Button Handler
     if (customId.startsWith('enter_gw_')) {
       const giveawayId = customId.replace('enter_gw_', '');
       const userRef = `https://donate-modded-2b27d-default-rtdb.firebaseio.com/ActiveGiveaways/${giveawayId}/participants/${interaction.user.id}.json`;
@@ -366,11 +363,10 @@ client.on('interactionCreate', async interaction => {
       return interaction.reply({ content: `✅ **Entry Confirmed!** You are officially entered to win!`, ephemeral: true });
     }
 
-    // B. Poll Voting Button Handler
     if (customId.startsWith('vote_')) {
       const parts = customId.split('_');
       const pollId = parts[1];
-      const optionNum = parts[2]; // '1' or '2'
+      const optionNum = parts[2];
 
       const pollRef = `https://donate-modded-2b27d-default-rtdb.firebaseio.com/Polls/${pollId}.json`;
       const res = await fetch(pollRef);
@@ -384,7 +380,6 @@ client.on('interactionCreate', async interaction => {
         return interaction.reply({ content: '⚠️ You have already voted in this poll!', ephemeral: true });
       }
 
-      // Update vote counts and track voter
       const updatedVoters = pollData.voters || {};
       updatedVoters[interaction.user.id] = optionNum;
 
@@ -399,7 +394,6 @@ client.on('interactionCreate', async interaction => {
         body: JSON.stringify({ votes1: v1, votes2: v2, voters: updatedVoters })
       });
 
-      // Update embed UI dynamically
       const updatedEmbed = EmbedBuilder.from(interaction.message.embeds[0])
         .setDescription(`**${pollData.question}**\n\n🟢 **[1]** ${pollData.opt1} (${v1} votes)\n🔵 **[2]** ${pollData.opt2} (${v2} votes)`);
 
@@ -407,7 +401,6 @@ client.on('interactionCreate', async interaction => {
       return interaction.reply({ content: `✅ Successfully voted for option **${optionNum === '1' ? pollData.opt1 : pollData.opt2}**!`, ephemeral: true });
     }
 
-    // C. Ticket Close Button Handler
     if (customId === 'close_ticket') {
       await interaction.reply({ content: '🔒 Closing this ticket in 5 seconds...', ephemeral: true });
       setTimeout(async () => {
@@ -423,6 +416,52 @@ client.on('interactionCreate', async interaction => {
     return;
   }
 
+  // Handle Ticket Dropdown Selection Menu
+  if (interaction.isStringSelectMenu() && interaction.customId === 'ticket_category_select') {
+    await interaction.deferReply({ ephemeral: true });
+
+    const categoryValue = interaction.values[0];
+    const guild = interaction.guild;
+    const member = interaction.member;
+
+    const existingChannel = guild.channels.cache.find(c => c.name === `ticket-${member.user.username.toLowerCase()}`);
+    if (existingChannel) {
+      return interaction.editReply({ content: `❌ You already have an active ticket open here: ${existingChannel}` });
+    }
+
+    try {
+      const ticketChannel = await guild.channels.create({
+        name: `ticket-${member.user.username}`,
+        type: ChannelType.GuildText,
+        permissionOverwrites: [
+          { id: guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
+          { id: member.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory] },
+          { id: client.user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] },
+        ],
+      });
+
+      await interaction.editReply({ content: `✅ Your ticket has been created! Head over to ${ticketChannel}` });
+
+      const welcomeEmbed = new EmbedBuilder()
+        .setColor('#7289da')
+        .setTitle(`Ticket: ${categoryValue.replace('_', ' ').toUpperCase()}`)
+        .setDescription(`Hello ${member}, thank you for reaching out.\n\nPlease describe your issue in detail, and a staff member will be with you shortly.`);
+
+      const closeButton = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId('close_ticket')
+          .setLabel('🔒 Close Ticket')
+          .setStyle(ButtonStyle.Danger)
+      );
+
+      await ticketChannel.send({ embeds: [welcomeEmbed], components: [closeButton] });
+    } catch (error) {
+      console.error('Failed to create ticket channel:', error);
+      await interaction.editReply({ content: '❌ Failed to create your ticket channel.' });
+    }
+    return;
+  }
+
   if (!interaction.isChatInputCommand()) return;
 
   const { commandName } = interaction;
@@ -431,7 +470,6 @@ client.on('interactionCreate', async interaction => {
     if (commandName === 'pong') {
       await interaction.reply({ content: 'Ping!', ephemeral: true });
     } 
-    
     else if (commandName === 'dm') {
       const targetUser = interaction.options.getUser('user');
       const messageContent = interaction.options.getString('message');
@@ -443,7 +481,6 @@ client.on('interactionCreate', async interaction => {
         await interaction.reply({ content: `Could not send a DM to **${targetUser.tag}**. Their DMs might be closed.`, ephemeral: true });
       }
     }
-
     else if (commandName === 'dmid') {
       const userId = interaction.options.getString('userid');
       const messageContent = interaction.options.getString('message');
@@ -456,11 +493,7 @@ client.on('interactionCreate', async interaction => {
         await interaction.reply({ content: `Could not send a DM to that User ID. Make sure the ID is correct and their DMs are open.`, ephemeral: true });
       }
     } 
-    
     else if (commandName === 'ban') {
-      if (!interaction.member.permissions.has(PermissionFlagsBits.BanMembers)) {
-        return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
-      }
       const user = interaction.options.getUser('user');
       const reason = interaction.options.getString('reason') || 'No reason provided';
       const member = await interaction.guild.members.fetch(user.id).catch(() => null);
@@ -470,11 +503,7 @@ client.on('interactionCreate', async interaction => {
       await member.ban({ reason });
       await interaction.reply({ content: `Successfully banned **${user.tag}**. Reason: ${reason}` });
     }
-
     else if (commandName === 'unban') {
-      if (!interaction.member.permissions.has(PermissionFlagsBits.BanMembers)) {
-        return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
-      }
       const userId = interaction.options.getString('userid');
       const reason = interaction.options.getString('reason') || 'No reason provided';
 
@@ -485,11 +514,7 @@ client.on('interactionCreate', async interaction => {
         await interaction.reply({ content: `Could not unban that user. Make sure the User ID is valid and they are actually banned.`, ephemeral: true });
       }
     } 
-    
     else if (commandName === 'kick') {
-      if (!interaction.member.permissions.has(PermissionFlagsBits.KickMembers)) {
-        return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
-      }
       const user = interaction.options.getUser('user');
       const reason = interaction.options.getString('reason') || 'No reason provided';
       const member = await interaction.guild.members.fetch(user.id).catch(() => null);
@@ -499,11 +524,7 @@ client.on('interactionCreate', async interaction => {
       await member.kick(reason);
       await interaction.reply({ content: `Successfully kicked **${user.tag}**. Reason: ${reason}` });
     } 
-    
     else if (commandName === 'timeout') {
-      if (!interaction.member.permissions.has(PermissionFlagsBits.ModerateMembers)) {
-        return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
-      }
       const user = interaction.options.getUser('user');
       const duration = interaction.options.getInteger('duration');
       const reason = interaction.options.getString('reason') || 'No reason provided';
@@ -515,11 +536,7 @@ client.on('interactionCreate', async interaction => {
       await member.timeout(durationMs, reason);
       await interaction.reply({ content: `Successfully timed out **${user.tag}** for ${duration} minutes. Reason: ${reason}` });
     }
-
     else if (commandName === 'warn') {
-      if (!interaction.member.permissions.has(PermissionFlagsBits.ModerateMembers)) {
-        return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
-      }
       const user = interaction.options.getUser('user');
       const reason = interaction.options.getString('reason');
 
@@ -536,11 +553,7 @@ client.on('interactionCreate', async interaction => {
         await interaction.reply({ content: `Successfully warned **${user.tag}**, but could not send them a DM (their DMs are closed).`, ephemeral: true });
       }
     }
-
     else if (commandName === 'clear') {
-      if (!interaction.member.permissions.has(PermissionFlagsBits.ManageMessages)) {
-        return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
-      }
       const amount = interaction.options.getInteger('amount');
       if (amount < 1 || amount > 100) {
         return interaction.reply({ content: 'Please provide a number between 1 and 100.', ephemeral: true });
@@ -553,11 +566,7 @@ client.on('interactionCreate', async interaction => {
         await interaction.reply({ content: 'Failed to delete messages. Some messages might be older than 14 days.', ephemeral: true });
       }
     } 
-    
     else if (commandName === 'announce') {
-      if (!interaction.member.permissions.has(PermissionFlagsBits.ManageMessages)) {
-        return interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
-      }
       const channel = interaction.options.getChannel('channel');
       const messageText = interaction.options.getString('message');
 
@@ -575,7 +584,6 @@ client.on('interactionCreate', async interaction => {
       await channel.send({ embeds: [embed] });
       await interaction.reply({ content: `Announcement successfully sent to ${channel}!`, ephemeral: true });
     } 
-    
     else if (commandName === 'serverinfo') {
       const { guild } = interaction;
       const owner = await guild.fetchOwner();
@@ -597,7 +605,6 @@ client.on('interactionCreate', async interaction => {
 
       await interaction.reply({ embeds: [embed] });
     }
-
     else if (commandName === 'userinfo') {
       const user = interaction.options.getUser('user') || interaction.user;
       const member = await interaction.guild.members.fetch(user.id).catch(() => null);
@@ -616,7 +623,6 @@ client.on('interactionCreate', async interaction => {
 
       await interaction.reply({ embeds: [embed] });
     }
-
     else if (commandName === 'ticketpanel') {
       const embed = new EmbedBuilder()
         .setColor('#7289da')
@@ -638,15 +644,12 @@ client.on('interactionCreate', async interaction => {
 
       await interaction.reply({ embeds: [embed], components: [row] });
     }
-
     else if (commandName === 'say') {
       const messageText = interaction.options.getString('message');
       await interaction.reply({ content: messageText });
     }
-
     else if (commandName === 'gamestats') {
       await interaction.deferReply();
-
       const universeId = '10543353328'; 
 
       try {
@@ -658,7 +661,6 @@ client.on('interactionCreate', async interaction => {
         }
 
         const game = data.data[0];
-
         const iconRes = await fetch(`https://thumbnails.roblox.com/v1/games/icons?universeIds=${universeId}&returnPolicy=PlaceHolder&size=512x512&format=Png&isCircular=false`);
         const iconData = await iconRes.json();
         const gameIconUrl = iconData.data?.[0]?.imageUrl || 'https://images.rbxcdn.com/39322bc627582b13fa2592fa44a5359a';
@@ -696,7 +698,6 @@ client.on('interactionCreate', async interaction => {
         await interaction.editReply({ content: '❌ Failed to connect to Roblox API.' });
       }
     }
-
     else if (commandName === 'stats') {
       await interaction.deferReply();
       const input = interaction.options.getString('player');
@@ -746,7 +747,6 @@ client.on('interactionCreate', async interaction => {
         await interaction.editReply({ content: '❌ Failed to fetch player statistics from Firebase/Roblox.' });
       }
     }
-
     else if (commandName === 'leaderboard') {
       await interaction.deferReply();
       const category = interaction.options.getString('category');
@@ -809,9 +809,7 @@ client.on('interactionCreate', async interaction => {
             if (thumbData.data?.[0]?.imageUrl) {
               avatarUrl = thumbData.data[0].imageUrl;
             }
-          } catch (e) {
-            // Fallback if API fails
-          }
+          } catch (e) {}
 
           const statValue = Number(player[category] || 0).toLocaleString();
           
@@ -828,12 +826,7 @@ client.on('interactionCreate', async interaction => {
         await interaction.editReply({ content: '❌ Failed to fetch leaderboard data from Firebase.' });
       }
     }
-
     else if (commandName === 'resetstats') {
-      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
-        return interaction.reply({ content: '❌ You need **Administrator** permissions to use this command.', ephemeral: true });
-      }
-
       await interaction.deferReply({ ephemeral: true });
       const input = interaction.options.getString('player');
       const statChoice = interaction.options.getString('stat');
@@ -882,12 +875,7 @@ client.on('interactionCreate', async interaction => {
         await interaction.editReply({ content: '❌ Failed to connect to Firebase to reset player stats.' });
       }
     }
-
     else if (commandName === 'createcode') {
-      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
-        return interaction.reply({ content: '❌ You need **Administrator** permissions to use this command.', ephemeral: true });
-      }
-
       await interaction.deferReply({ ephemeral: true });
       const code = interaction.options.getString('code').trim().toUpperCase();
       const reward = interaction.options.getInteger('reward');
@@ -912,12 +900,7 @@ client.on('interactionCreate', async interaction => {
         await interaction.editReply({ content: '❌ Failed to save promo code to Firebase.' });
       }
     }
-
     else if (commandName === 'deletecode') {
-      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
-        return interaction.reply({ content: '❌ You need **Administrator** permissions to use this command.', ephemeral: true });
-      }
-
       await interaction.deferReply({ ephemeral: true });
       const code = interaction.options.getString('code').trim().toUpperCase();
 
@@ -938,12 +921,7 @@ client.on('interactionCreate', async interaction => {
         await interaction.editReply({ content: '❌ Failed to delete promo code from Firebase.' });
       }
     }
-
     else if (commandName === 'givetitle') {
-      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
-        return interaction.reply({ content: '❌ You need **Administrator** permissions to use this command.', ephemeral: true });
-      }
-
       await interaction.deferReply({ ephemeral: true });
       const input = interaction.options.getString('player');
       const customTitle = interaction.options.getString('title');
@@ -975,12 +953,7 @@ client.on('interactionCreate', async interaction => {
         await interaction.editReply({ content: '❌ Failed to save custom title to Firebase.' });
       }
     }
-
     else if (commandName === 'removetitle') {
-      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
-        return interaction.reply({ content: '❌ You need **Administrator** permissions to use this command.', ephemeral: true });
-      }
-
       await interaction.deferReply({ ephemeral: true });
       const input = interaction.options.getString('player');
 
@@ -1009,12 +982,7 @@ client.on('interactionCreate', async interaction => {
         await interaction.editReply({ content: '❌ Failed to remove custom title from Firebase.' });
       }
     }
-
     else if (commandName === 'syncban') {
-      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
-        return interaction.reply({ content: '❌ Administrator permission required.', ephemeral: true });
-      }
-
       await interaction.deferReply();
       const discordUser = interaction.options.getUser('target');
       const robloxId = interaction.options.getString('robloxid');
@@ -1050,12 +1018,7 @@ client.on('interactionCreate', async interaction => {
 
       await interaction.editReply({ embeds: [banEmbed] });
     }
-
     else if (commandName === 'giveaway') {
-      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
-        return interaction.reply({ content: '❌ Administrator permission required.', ephemeral: true });
-      }
-
       const prize = interaction.options.getString('prize');
       const winnerCount = interaction.options.getInteger('winners');
       const durationMinutes = interaction.options.getInteger('duration');
@@ -1115,12 +1078,7 @@ client.on('interactionCreate', async interaction => {
         }
       }, durationMinutes * 60 * 1000);
     }
-
     else if (commandName === 'poll') {
-      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
-        return interaction.reply({ content: '❌ Administrator permission required.', ephemeral: true });
-      }
-
       const question = interaction.options.getString('question');
       const opt1 = interaction.options.getString('option1');
       const opt2 = interaction.options.getString('option2');
@@ -1153,52 +1111,5 @@ client.on('interactionCreate', async interaction => {
   }
 });
 
-// Handle Ticket Dropdown
-client.on('interactionCreate', async interaction => {
-  if (interaction.isStringSelectMenu() && interaction.customId === 'ticket_category_select') {
-    await interaction.deferReply({ ephemeral: true });
-
-    const categoryValue = interaction.values[0];
-    const guild = interaction.guild;
-    const member = interaction.member;
-
-    const existingChannel = guild.channels.cache.find(c => c.name === `ticket-${member.user.username.toLowerCase()}`);
-    if (existingChannel) {
-      return interaction.editReply({ content: `❌ You already have an active ticket open here: ${existingChannel}` });
-    }
-
-    try {
-      const ticketChannel = await guild.channels.create({
-        name: `ticket-${member.user.username}`,
-        type: ChannelType.GuildText,
-        permissionOverwrites: [
-          { id: guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
-          { id: member.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory] },
-          { id: client.user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] },
-        ],
-      });
-
-      await interaction.editReply({ content: `✅ Your ticket has been created! Head over to ${ticketChannel}` });
-
-      const welcomeEmbed = new EmbedBuilder()
-        .setColor('#7289da')
-        .setTitle(`Ticket: ${categoryValue.replace('_', ' ').toUpperCase()}`)
-        .setDescription(`Hello ${member}, thank you for reaching out.\n\nPlease describe your issue in detail, and a staff member will be with you shortly.`);
-
-      const closeButton = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-          .setCustomId('close_ticket')
-          .setLabel('🔒 Close Ticket')
-          .setStyle(ButtonStyle.Danger)
-      );
-
-      await ticketChannel.send({ embeds: [welcomeEmbed], components: [closeButton] });
-    } catch (error) {
-      console.error('Failed to create ticket channel:', error);
-      await interaction.editReply({ content: '❌ Failed to create your ticket channel.' });
-    }
-  }
-});
-
-client.login(process.env.TOKEN);
+// Single client login entry point
 client.login(process.env.TOKEN || process.env.TOKEN2);
