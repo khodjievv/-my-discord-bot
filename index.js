@@ -474,6 +474,7 @@ client.on('interactionCreate', async interaction => {
         ],
       });
 
+      // HERE IS THE EMBED WITH THE BIG BANNER IMAGE (.setImage)
       const ticketEmbed = new EmbedBuilder()
         .setColor('#3498db')
         .setTitle(`Ticket: ${interaction.user.tag}`)
@@ -698,6 +699,7 @@ client.on('interactionCreate', async interaction => {
     else if (commandName === 'ticketpanel') {
       const channel = interaction.options.getChannel('target_channel');
 
+      // HERE IS THE TICKET PANEL EMBED WITH THE BIG BANNER IMAGE (.setImage)
       const embed = new EmbedBuilder()
         .setColor('#3498db')
         .setTitle('❓ Support')
