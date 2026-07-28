@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, ChannelType, PermissionsBitField } = require('discord.js');
+const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, ChannelType, PermissionsBitField, AttachmentBuilder } = require('discord.js');
 const express = require('express');
 
 // Express server for Render
@@ -286,7 +286,6 @@ client.once('ready', async () => {
       { body: commands },
     );
 
-    // Explicitly lock down permissions per role in Discord so only the specified role can see/use them
     const guild = client.guilds.cache.get(GUILD_ID);
     if (guild) {
       const permissionsBody = registeredCommands.map(cmd => ({
@@ -294,7 +293,7 @@ client.once('ready', async () => {
         permissions: [
           {
             id: TARGET_ROLE_ID,
-            type: 1, // 1 represents ROLE type in Discord permissions v2 API
+            type: 1,
             permission: true
           }
         ]
@@ -352,7 +351,6 @@ const badWords = ['badword1', 'badword2', 'scamlink.com'];
 client.on('messageCreate', async message => {
   if (message.author.bot) return;
 
-  // 1. Auto-Moderation
   if (message.guild) {
     const contentLower = message.content.toLowerCase();
     const containsForbidden = badWords.some(word => contentLower.includes(word));
@@ -370,7 +368,6 @@ client.on('messageCreate', async message => {
     }
   }
 
-  // 2. DM Forwarding to Log Channel
   if (!message.guild) {
     const logChannelId = '1430151280092905666'; 
     const logChannel = client.channels.cache.get(logChannelId);
@@ -390,7 +387,6 @@ client.on('messageCreate', async message => {
 
 // Handle Slash Command & Button/Poll Interactions
 client.on('interactionCreate', async interaction => {
-  // Security Check: Enforce Role Restriction on all interactions
   if (interaction.inGuild() && !interaction.member.roles.cache.has(TARGET_ROLE_ID)) {
     if (interaction.isRepliable()) {
       return interaction.reply({ content: '❌ You do not have the required role to use this bot.', ephemeral: true });
@@ -398,11 +394,9 @@ client.on('interactionCreate', async interaction => {
     return;
   }
 
-  // Handle Button / Interactive Component Clicks
   if (interaction.isButton()) {
     const customId = interaction.customId;
 
-    // A. Giveaway Entry Button Handler
     if (customId.startsWith('enter_gw_')) {
       const giveawayId = customId.replace('enter_gw_', '');
       const userRef = `https://donate-modded-2b27d-default-rtdb.firebaseio.com/ActiveGiveaways/${giveawayId}/participants/${interaction.user.id}.json`;
@@ -423,11 +417,10 @@ client.on('interactionCreate', async interaction => {
       return interaction.reply({ content: `✅ **Entry Confirmed!** You are officially entered to the Giveaway!`, ephemeral: true });
     }
 
-    // B. Poll Voting Button Handler
     if (customId.startsWith('vote_')) {
       const parts = customId.split('_');
       const pollId = parts[1];
-      const optionNum = parts[2]; // '1' or '2'
+      const optionNum = parts[2];
 
       const pollRef = `https://donate-modded-2b27d-default-rtdb.firebaseio.com/Polls/${pollId}.json`;
       const res = await fetch(pollRef);
@@ -441,7 +434,6 @@ client.on('interactionCreate', async interaction => {
         return interaction.reply({ content: '⚠️ You have already voted in this poll!', ephemeral: true });
       }
 
-      // Update vote counts and track voter
       const updatedVoters = pollData.voters || {};
       updatedVoters[interaction.user.id] = optionNum;
 
@@ -456,7 +448,6 @@ client.on('interactionCreate', async interaction => {
         body: JSON.stringify({ votes1: v1, votes2: v2, voters: updatedVoters })
       });
 
-      // Update embed UI dynamically
       const updatedEmbed = EmbedBuilder.from(interaction.message.embeds[0])
         .setDescription(`**${pollData.question}**\n\n🟢 **[1]** ${pollData.opt1} (${v1} votes)\n🔵 **[2]** ${pollData.opt2} (${v2} votes)`);
 
@@ -464,7 +455,6 @@ client.on('interactionCreate', async interaction => {
       return interaction.reply({ content: `✅ Successfully voted for option **${optionNum === '1' ? pollData.opt1 : pollData.opt2}**!`, ephemeral: true });
     }
 
-    // C. Ticket Close Button Handler
     if (customId === 'close_ticket') {
       await interaction.reply({ content: '🔒 Closing this ticket in 5 seconds...', ephemeral: true });
       setTimeout(async () => {
@@ -1132,15 +1122,17 @@ client.on('interactionCreate', async interaction => {
 
       const row = new ActionRowBuilder().addComponents(enterButton);
 
+      const attachment = new AttachmentBuilder('giveaway.png');
+
       const embed = new EmbedBuilder()
         .setColor('#00ffcc')
         .setTitle('GIVEAWAY By [💰] Puataun')
         .setDescription(`Prize: **${prize}**\nWinners: **${winnerCount}**\nEnds: <t:${Math.floor(endTime / 1000)}:R>\n\nClick the button below to enter for the giveaway!`)
-        .setImage('https://gemini.google.com/77d8063f-9f78-4ae5-b437-6e4b1f254438')
+        .setImage('attachment://giveaway.png')
         .setFooter({ text: `Hosted by ${interaction.user.tag}` })
         .setTimestamp(endTime);
 
-      const msg = await interaction.reply({ embeds: [embed], components: [row], fetchReply: true });
+      const msg = await interaction.reply({ embeds: [embed], components: [row], files: [attachment], fetchReply: true });
 
       setTimeout(async () => {
         try {
@@ -1148,7 +1140,7 @@ client.on('interactionCreate', async interaction => {
           const participantsObj = await res.json();
 
           if (!participantsObj) {
-            return msg.edit({ content: `❌ Giveaway for **${prize}** ended, but nobody entered!`, embeds: [], components: [] });
+            return msg.edit({ content: `❌ Giveaway for **${prize}** ended, but nobody entered!`, embeds: [], components: [], files: [] });
           }
 
           const userIds = Object.keys(participantsObj);
@@ -1160,14 +1152,16 @@ client.on('interactionCreate', async interaction => {
             userIds.splice(randomIndex, 1);
           }
 
+          const endedAttachment = new AttachmentBuilder('giveaway.png');
+
           const endedEmbed = new EmbedBuilder()
             .setColor('#ff007f')
             .setTitle('🎉 GIVEAWAY CONCLUDED 🎉')
             .setDescription(`Prize: **${prize}**\n\n👑 **Winner(s):**\n${winners.map(w => `• ${w}`).join('\n')}`)
-            .setImage('https://gemini.google.com/77d8063f-9f78-4ae5-b437-6e4b1f254438')
+            .setImage('attachment://giveaway.png')
             .setTimestamp();
 
-          await msg.edit({ embeds: [endedEmbed], components: [] });
+          await msg.edit({ embeds: [endedEmbed], components: [], files: [endedAttachment] });
           await interaction.followUp({ content: `🎊 Congratulations ${winners.map(w => `@${w}`).join(', ')}! You won **${prize}**!` });
         } catch (err) {
           console.error('Giveaway timer error:', err);
