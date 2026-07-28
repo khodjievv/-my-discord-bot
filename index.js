@@ -227,13 +227,6 @@ const commands = [
     .addStringOption(option => option.setName('player').setDescription('Roblox User ID, Username, or Nickname').setRequired(true)),
 
   new SlashCommandBuilder()
-    .setName('syncban')
-    .setDescription('Globally bans a user from both Discord and the Roblox game')
-    .addUserOption(option => option.setName('target').setDescription('Discord user to ban').setRequired(true))
-    .addStringOption(option => option.setName('robloxid').setDescription('Roblox User ID to blacklist').setRequired(true))
-    .addStringOption(option => option.setName('reason').setDescription('Reason for global ban').setRequired(false)),
-
-  new SlashCommandBuilder()
     .setName('giveaway')
     .setDescription('Host an epic game giveaway')
     .addStringOption(option => option.setName('prize').setDescription('What are you giving away? (e.g. 5,000 Robux)').setRequired(true))
@@ -485,6 +478,7 @@ client.on('interactionCreate', async interaction => {
         .setColor('#3498db')
         .setTitle(`Ticket: ${interaction.user.tag}`)
         .setDescription(`**Help with:** ${helpReason}\n**Issue/Question:** ${issueQuestion}`)
+        .setImage('https://chatgpt.com/backend-api/estuary/content?id=file_00000000285c8246935b2ec07f2b9ada&ts=495901&p=fs&cid=1&sig=aa4e0be7854f5bea74475498afb4518c4e69a0ae780d5a7193b94727bc88b626&v=0')
         .setTimestamp();
 
       const closeButton = new ActionRowBuilder().addComponents(
@@ -1092,47 +1086,6 @@ client.on('interactionCreate', async interaction => {
         console.error('Failed to remove title from Firebase:', error);
         await interaction.editReply({ content: '❌ Failed to remove custom title from Firebase.' });
       }
-    }
-
-    else if (commandName === 'syncban') {
-      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
-        return interaction.reply({ content: '❌ Administrator permission required.', ephemeral: true });
-      }
-
-      await interaction.deferReply();
-      const discordUser = interaction.options.getUser('target');
-      const robloxId = interaction.options.getString('robloxid');
-      const reason = interaction.options.getString('reason') || 'No reason provided';
-
-      try {
-        await interaction.guild.members.ban(discordUser.id, { reason: reason });
-      } catch (e) {
-        console.log('Failed to ban from Discord server: ' + e);
-      }
-
-      await fetch(`https://donate-modded-2b27d-default-rtdb.firebaseio.com/BannedPlayers/${robloxId}.json`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          bannedBy: interaction.user.tag,
-          reason: reason,
-          timestamp: Date.now(),
-          discordId: discordUser.id
-        })
-      });
-
-      const banEmbed = new EmbedBuilder()
-        .setColor('#ff0000')
-        .setTitle('🚨 GLOBAL SECURITY BAN EXECUTED')
-        .setDescription(`The hammer has dropped. User has been eradicated across all platforms.`)
-        .addFields(
-          { name: 'Discord User', value: `${discordUser.tag} (${discordUser.id})`, inline: true },
-          { name: 'Roblox ID', value: `${robloxId}`, inline: true },
-          { name: 'Reason', value: reason, inline: false }
-        )
-        .setTimestamp();
-
-      await interaction.editReply({ embeds: [banEmbed] });
     }
 
     else if (commandName === 'giveaway') {
