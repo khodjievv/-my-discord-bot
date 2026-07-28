@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, ChannelType, PermissionsBitField, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
+const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, ChannelType, PermissionsBitField } = require('discord.js');
 const express = require('express');
 
 // Express server for Render
@@ -131,9 +131,7 @@ const commands = [
 
   new SlashCommandBuilder()
     .setName('ticketpanel')
-    .setDescription('Posts the ticket support portal panel')
-    .addChannelOption(option => option.setName('target_channel').setDescription('Channel to send panel').setRequired(true))
-    .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
+    .setDescription('Posts the ticket support portal panel'),
 
   new SlashCommandBuilder()
     .setName('say')
@@ -225,6 +223,13 @@ const commands = [
     .setName('removetitle')
     .setDescription('Removes the custom in-game title or badge from a player')
     .addStringOption(option => option.setName('player').setDescription('Roblox User ID, Username, or Nickname').setRequired(true)),
+
+  new SlashCommandBuilder()
+    .setName('syncban')
+    .setDescription('Globally bans a user from both Discord and the Roblox game')
+    .addUserOption(option => option.setName('target').setDescription('Discord user to ban').setRequired(true))
+    .addStringOption(option => option.setName('robloxid').setDescription('Roblox User ID to blacklist').setRequired(true))
+    .addStringOption(option => option.setName('reason').setDescription('Reason for global ban').setRequired(false)),
 
   new SlashCommandBuilder()
     .setName('giveaway')
@@ -402,35 +407,7 @@ client.on('interactionCreate', async interaction => {
       return interaction.reply({ content: `✅ Successfully voted for option **${optionNum === '1' ? pollData.opt1 : pollData.opt2}**!`, ephemeral: true });
     }
 
-    // C. Open Ticket Modal Button Handler
-    if (customId === 'open_ticket_modal') {
-      const modal = new ModalBuilder()
-        .setCustomId('ticket_submission_modal')
-        .setTitle('User Support');
-
-      const descInput = new TextInputBuilder()
-        .setCustomId('ticket_description')
-        .setLabel('What do you need help with?')
-        .setPlaceholder('Be descriptive')
-        .setStyle(TextInputStyle.Paragraph)
-        .setRequired(true);
-
-      const issueInput = new TextInputBuilder()
-        .setCustomId('ticket_issue')
-        .setLabel('What is your issue/question?')
-        .setPlaceholder('Ask away!')
-        .setStyle(TextInputStyle.Short)
-        .setRequired(true);
-
-      modal.addComponents(
-        new ActionRowBuilder().addComponents(descInput),
-        new ActionRowBuilder().addComponents(issueInput)
-      );
-
-      return interaction.showModal(modal);
-    }
-
-    // D. Ticket Close Button Handler
+    // C. Ticket Close Button Handler
     if (customId === 'close_ticket') {
       await interaction.reply({ content: '🔒 Closing this ticket in 5 seconds...', ephemeral: true });
       setTimeout(async () => {
@@ -444,62 +421,6 @@ client.on('interactionCreate', async interaction => {
     }
 
     return;
-  }
-
-  // Handle Modal Submissions
-  if (interaction.isModalSubmit() && interaction.customId === 'ticket_submission_modal') {
-    const helpReason = interaction.fields.getTextInputValue('ticket_description');
-    const issueQuestion = interaction.fields.getTextInputValue('ticket_issue');
-
-    await interaction.deferReply({ ephemeral: true });
-
-    try {
-      const existingChannel = interaction.guild.channels.cache.find(c => c.name === `ticket-${interaction.user.username.toLowerCase()}`);
-      if (existingChannel) {
-        return interaction.editReply({ content: `❌ You already have an active ticket open here: ${existingChannel}` });
-      }
-
-      const ticketChannel = await interaction.guild.channels.create({
-        name: `ticket-${interaction.user.username}`,
-        type: ChannelType.GuildText,
-        permissionOverwrites: [
-          {
-            id: interaction.guild.id,
-            deny: [PermissionsBitField.Flags.ViewChannel],
-          },
-          {
-            id: interaction.user.id,
-            allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory],
-          },
-        ],
-      });
-
-      // HERE IS THE EMBED WITH THE BIG BANNER IMAGE (.setImage)
-      const ticketEmbed = new EmbedBuilder()
-        .setColor('#3498db')
-        .setTitle(`Ticket: ${interaction.user.tag}`)
-        .setDescription(`**Help with:** ${helpReason}\n**Issue/Question:** ${issueQuestion}`)
-        .setImage('https://chatgpt.com/backend-api/estuary/content?id=file_00000000285c8246935b2ec07f2b9ada&ts=495901&p=fs&cid=1&sig=aa4e0be7854f5bea74475498afb4518c4e69a0ae780d5a7193b94727bc88b626&v=0')
-        .setTimestamp();
-
-      const closeButton = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-          .setCustomId('close_ticket')
-          .setLabel('🔒 Close Ticket')
-          .setStyle(ButtonStyle.Danger)
-      );
-
-      await ticketChannel.send({ content: `${interaction.user} Support will be with you shortly!`, embeds: [ticketEmbed], components: [closeButton] });
-
-      return interaction.editReply({
-        content: `✅ Your ticket channel has been created successfully: ${ticketChannel}!`,
-      });
-    } catch (err) {
-      console.error('Failed to create ticket channel:', err);
-      return interaction.editReply({
-        content: `❌ Failed to create ticket channel. Make sure the bot has 'Manage Channels' permissions!`,
-      });
-    }
   }
 
   if (!interaction.isChatInputCommand()) return;
@@ -697,26 +618,25 @@ client.on('interactionCreate', async interaction => {
     }
 
     else if (commandName === 'ticketpanel') {
-      const channel = interaction.options.getChannel('target_channel');
-
-      // HERE IS THE TICKET PANEL EMBED WITH THE BIG BANNER IMAGE (.setImage)
       const embed = new EmbedBuilder()
-        .setColor('#3498db')
-        .setTitle('❓ Support')
-        .setDescription('Do you have any questions regarding the server or game?\nCreate a ticket here and our moderators will help you!\n\nPlease keep in mind that creating joke tickets is against the rules.')
-        .setImage('https://chatgpt.com/backend-api/estuary/content?id=file_00000000285c8246935b2ec07f2b9ada&ts=495901&p=fs&cid=1&sig=aa4e0be7854f5bea74475498afb4518c4e69a0ae780d5a7193b94727bc88b626&v=0')
-        .setFooter({ text: '[💰] Puataun’s Utilities', iconURL: 'https://chatgpt.com/backend-api/estuary/content?id=file_00000000285c8246935b2ec07f2b9ada&ts=495901&p=fs&cid=1&sig=aa4e0be7854f5bea74475498afb4518c4e69a0ae780d5a7193b94727bc88b626&v=0' });
+        .setColor('#7289da')
+        .setTitle('Support Portal')
+        .setDescription('👋 **How can we help you today?**\n\nSelect the most relevant category from the menu below to open a ticket.\n\n**Note:** You can only have one active ticket at a time.')
+        .setImage('https://media.discordapp.net/attachments/1530989819377881138/1531672789835190393/be52db3a-4dae-400e-a514-c2e1e40142f5.png?ex=6a6a10f2&is=6a68bf72&hm=a6961b00805a4b81c31a26e185c2712d863313a701c750c2674a0f5407ddca73&=&format=webp&quality=lossless&width=1218&height=672');
 
       const row = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-          .setCustomId('open_ticket_modal')
-          .setLabel('Create ticket')
-          .setStyle(ButtonStyle.Primary)
-          .setEmoji('📥')
+        new StringSelectMenuBuilder()
+          .setCustomId('ticket_category_select')
+          .setPlaceholder('📁 Choose a category...')
+          .addOptions([
+            { label: 'General Inquiry', value: 'general_inquiry', emoji: '🛡️' },
+            { label: 'Player Reporting', value: 'player_reporting', emoji: '⛔' },
+            { label: 'Billing & Ranks', value: 'billing_ranks', emoji: '💰' },
+            { label: 'Bug Report', value: 'bug_report', emoji: '🐛' },
+          ]),
       );
 
-      await channel.send({ embeds: [embed], components: [row] });
-      return interaction.reply({ content: '✅ Ticket panel sent successfully!', ephemeral: true });
+      await interaction.reply({ embeds: [embed], components: [row] });
     }
 
     else if (commandName === 'say') {
@@ -1090,6 +1010,47 @@ client.on('interactionCreate', async interaction => {
       }
     }
 
+    else if (commandName === 'syncban') {
+      if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+        return interaction.reply({ content: '❌ Administrator permission required.', ephemeral: true });
+      }
+
+      await interaction.deferReply();
+      const discordUser = interaction.options.getUser('target');
+      const robloxId = interaction.options.getString('robloxid');
+      const reason = interaction.options.getString('reason') || 'No reason provided';
+
+      try {
+        await interaction.guild.members.ban(discordUser.id, { reason: reason });
+      } catch (e) {
+        console.log('Failed to ban from Discord server: ' + e);
+      }
+
+      await fetch(`https://donate-modded-2b27d-default-rtdb.firebaseio.com/BannedPlayers/${robloxId}.json`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          bannedBy: interaction.user.tag,
+          reason: reason,
+          timestamp: Date.now(),
+          discordId: discordUser.id
+        })
+      });
+
+      const banEmbed = new EmbedBuilder()
+        .setColor('#ff0000')
+        .setTitle('🚨 GLOBAL SECURITY BAN EXECUTED')
+        .setDescription(`The hammer has dropped. User has been eradicated across all platforms.`)
+        .addFields(
+          { name: 'Discord User', value: `${discordUser.tag} (${discordUser.id})`, inline: true },
+          { name: 'Roblox ID', value: `${robloxId}`, inline: true },
+          { name: 'Reason', value: reason, inline: false }
+        )
+        .setTimestamp();
+
+      await interaction.editReply({ embeds: [banEmbed] });
+    }
+
     else if (commandName === 'giveaway') {
       if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
         return interaction.reply({ content: '❌ Administrator permission required.', ephemeral: true });
@@ -1192,4 +1153,52 @@ client.on('interactionCreate', async interaction => {
   }
 });
 
+// Handle Ticket Dropdown
+client.on('interactionCreate', async interaction => {
+  if (interaction.isStringSelectMenu() && interaction.customId === 'ticket_category_select') {
+    await interaction.deferReply({ ephemeral: true });
+
+    const categoryValue = interaction.values[0];
+    const guild = interaction.guild;
+    const member = interaction.member;
+
+    const existingChannel = guild.channels.cache.find(c => c.name === `ticket-${member.user.username.toLowerCase()}`);
+    if (existingChannel) {
+      return interaction.editReply({ content: `❌ You already have an active ticket open here: ${existingChannel}` });
+    }
+
+    try {
+      const ticketChannel = await guild.channels.create({
+        name: `ticket-${member.user.username}`,
+        type: ChannelType.GuildText,
+        permissionOverwrites: [
+          { id: guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
+          { id: member.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory] },
+          { id: client.user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] },
+        ],
+      });
+
+      await interaction.editReply({ content: `✅ Your ticket has been created! Head over to ${ticketChannel}` });
+
+      const welcomeEmbed = new EmbedBuilder()
+        .setColor('#7289da')
+        .setTitle(`Ticket: ${categoryValue.replace('_', ' ').toUpperCase()}`)
+        .setDescription(`Hello ${member}, thank you for reaching out.\n\nPlease describe your issue in detail, and a staff member will be with you shortly.`);
+
+      const closeButton = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId('close_ticket')
+          .setLabel('🔒 Close Ticket')
+          .setStyle(ButtonStyle.Danger)
+      );
+
+      await ticketChannel.send({ embeds: [welcomeEmbed], components: [closeButton] });
+    } catch (error) {
+      console.error('Failed to create ticket channel:', error);
+      await interaction.editReply({ content: '❌ Failed to create your ticket channel.' });
+    }
+  }
+});
+
+client.login(process.env.TOKEN);
 client.login(process.env.TOKEN || process.env.TOKEN2);
