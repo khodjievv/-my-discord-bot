@@ -1202,6 +1202,8 @@ client.on('interactionCreate', async interaction => {
     console.error('Error handling command:', error);
     if (!interaction.replied && !interaction.deferred) {
       await interaction.reply({ content: 'There was an error executing this command!', ephemeral: true }).catch(() => {});
+    } else if (interaction.deferred && !interaction.replied) {
+      await interaction.editReply({ content: 'There was an error executing this command!' }).catch(() => {});
     }
   }
 });
