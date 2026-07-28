@@ -60,78 +60,93 @@ async function getRobloxUserId(input) {
   return null;
 }
 
-// Define Slash Commands
+// Define Slash Commands with default_member_permissions set to hide them from users without the role/permissions
+const TARGET_ROLE_ID = '1457974202798833811';
+
 const commands = [
   new SlashCommandBuilder()
     .setName('pong')
-    .setDescription('Replies with Ping!'),
+    .setDescription('Replies with Ping!')
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   new SlashCommandBuilder()
     .setName('dm')
     .setDescription('Sends a custom message to a server member')
     .addUserOption(option => option.setName('user').setDescription('The server member to message').setRequired(true))
-    .addStringOption(option => option.setName('message').setDescription('The message to send').setRequired(true)),
+    .addStringOption(option => option.setName('message').setDescription('The message to send').setRequired(true))
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   new SlashCommandBuilder()
     .setName('dmid')
     .setDescription('Sends a custom message to any user by their User ID (even if not in server)')
     .addStringOption(option => option.setName('userid').setDescription('The User ID of the person to message').setRequired(true))
-    .addStringOption(option => option.setName('message').setDescription('The message to send').setRequired(true)),
+    .addStringOption(option => option.setName('message').setDescription('The message to send').setRequired(true))
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   new SlashCommandBuilder()
     .setName('ban')
     .setDescription('Bans a member from the server')
     .addUserOption(option => option.setName('user').setDescription('The user to ban').setRequired(true))
-    .addStringOption(option => option.setName('reason').setDescription('Reason for ban').setRequired(false)),
+    .addStringOption(option => option.setName('reason').setDescription('Reason for ban').setRequired(false))
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   new SlashCommandBuilder()
     .setName('unban')
     .setDescription('Unbans a user by their User ID')
     .addStringOption(option => option.setName('userid').setDescription('The ID of the user to unban').setRequired(true))
-    .addStringOption(option => option.setName('reason').setDescription('Reason for unban').setRequired(false)),
+    .addStringOption(option => option.setName('reason').setDescription('Reason for unban').setRequired(false))
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   new SlashCommandBuilder()
     .setName('kick')
     .setDescription('Kicks a member from the server')
     .addUserOption(option => option.setName('user').setDescription('The user to kick').setRequired(true))
-    .addStringOption(option => option.setName('reason').setDescription('Reason for kick').setRequired(false)),
+    .addStringOption(option => option.setName('reason').setDescription('Reason for kick').setRequired(false))
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   new SlashCommandBuilder()
     .setName('timeout')
     .setDescription('Timeouts a member')
     .addUserOption(option => option.setName('user').setDescription('The user to timeout').setRequired(true))
     .addIntegerOption(option => option.setName('duration').setDescription('Duration in minutes').setRequired(true))
-    .addStringOption(option => option.setName('reason').setDescription('Reason for timeout').setRequired(false)),
+    .addStringOption(option => option.setName('reason').setDescription('Reason for timeout').setRequired(false))
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   new SlashCommandBuilder()
     .setName('warn')
     .setDescription('Issues a warning to a member')
     .addUserOption(option => option.setName('user').setDescription('The user to warn').setRequired(true))
-    .addStringOption(option => option.setName('reason').setDescription('Reason for warning').setRequired(true)),
+    .addStringOption(option => option.setName('reason').setDescription('Reason for warning').setRequired(true))
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   new SlashCommandBuilder()
     .setName('clear')
     .setDescription('Clears a specified number of messages from the channel')
-    .addIntegerOption(option => option.setName('amount').setDescription('Number of messages to delete (1-100)').setRequired(true)),
+    .addIntegerOption(option => option.setName('amount').setDescription('Number of messages to delete (1-100)').setRequired(true))
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   new SlashCommandBuilder()
     .setName('announce')
     .setDescription('Sends an announcement message to a specific channel')
     .addChannelOption(option => option.setName('channel').setDescription('The channel to send the announcement to').setRequired(true))
-    .addStringOption(option => option.setName('message').setDescription('The announcement message').setRequired(true)),
+    .addStringOption(option => option.setName('message').setDescription('The announcement message').setRequired(true))
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   new SlashCommandBuilder()
     .setName('serverinfo')
-    .setDescription('Shows detailed information about the server'),
+    .setDescription('Shows detailed information about the server')
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   new SlashCommandBuilder()
     .setName('userinfo')
     .setDescription('Shows detailed information about a specific user')
-    .addUserOption(option => option.setName('user').setDescription('The user to inspect').setRequired(false)),
+    .addUserOption(option => option.setName('user').setDescription('The user to inspect').setRequired(false))
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   new SlashCommandBuilder()
     .setName('ticketpanel')
-    .setDescription('Posts the ticket support portal panel'),
+    .setDescription('Posts the ticket support portal panel')
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   new SlashCommandBuilder()
     .setName('say')
@@ -140,11 +155,13 @@ const commands = [
       option.setName('message')
         .setDescription('The message you want the bot to say')
         .setRequired(true)
-    ),
+    )
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   new SlashCommandBuilder()
     .setName('gamestats')
-    .setDescription('Fetches and displays live stats from your Roblox game'),
+    .setDescription('Fetches and displays live stats from your Roblox game')
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   new SlashCommandBuilder()
     .setName('stats')
@@ -153,7 +170,8 @@ const commands = [
       option.setName('player')
         .setDescription('Roblox User ID, Username, or Nickname')
         .setRequired(true)
-    ),
+    )
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   new SlashCommandBuilder()
     .setName('leaderboard')
@@ -168,7 +186,8 @@ const commands = [
           { name: 'Giftbux', value: 'Giftbux' },
           { name: 'Robux', value: 'Robux' }
         )
-    ),
+    )
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   new SlashCommandBuilder()
     .setName('resetstats')
@@ -189,7 +208,8 @@ const commands = [
           { name: 'Giftbux', value: 'Giftbux' },
           { name: 'Robux', value: 'Robux' }
         )
-    ),
+    )
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   new SlashCommandBuilder()
     .setName('createcode')
@@ -206,37 +226,43 @@ const commands = [
           { name: 'Giftbux', value: 'Giftbux' },
           { name: 'Robux', value: 'Robux' }
         )
-    ),
+    )
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   new SlashCommandBuilder()
     .setName('deletecode')
     .setDescription('Deletes an existing game promo code from Firebase')
-    .addStringOption(option => option.setName('code').setDescription('The promo code to delete').setRequired(true)),
+    .addStringOption(option => option.setName('code').setDescription('The promo code to delete').setRequired(true))
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
     
   new SlashCommandBuilder()
     .setName('givetitle')
     .setDescription('Grants a custom in-game title or badge to a player')
     .addStringOption(option => option.setName('player').setDescription('Roblox User ID, Username, or Nickname').setRequired(true))
-    .addStringOption(option => option.setName('title').setDescription('The custom title or badge name (e.g., VIP)').setRequired(true)),
+    .addStringOption(option => option.setName('title').setDescription('The custom title or badge name (e.g., VIP)').setRequired(true))
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   new SlashCommandBuilder()
     .setName('removetitle')
     .setDescription('Removes the custom in-game title or badge from a player')
-    .addStringOption(option => option.setName('player').setDescription('Roblox User ID, Username, or Nickname').setRequired(true)),
+    .addStringOption(option => option.setName('player').setDescription('Roblox User ID, Username, or Nickname').setRequired(true))
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   new SlashCommandBuilder()
     .setName('syncban')
     .setDescription('Globally bans a user from both Discord and the Roblox game')
     .addUserOption(option => option.setName('target').setDescription('Discord user to ban').setRequired(true))
     .addStringOption(option => option.setName('robloxid').setDescription('Roblox User ID to blacklist').setRequired(true))
-    .addStringOption(option => option.setName('reason').setDescription('Reason for global ban').setRequired(false)),
+    .addStringOption(option => option.setName('reason').setDescription('Reason for global ban').setRequired(false))
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   new SlashCommandBuilder()
     .setName('giveaway')
     .setDescription('Host an epic game giveaway')
     .addStringOption(option => option.setName('prize').setDescription('What are you giving away? (e.g. 5,000 Robux)').setRequired(true))
     .addIntegerOption(option => option.setName('winners').setDescription('Number of winners').setRequired(true))
-    .addIntegerOption(option => option.setName('duration').setDescription('Duration in minutes').setRequired(true)),
+    .addIntegerOption(option => option.setName('duration').setDescription('Duration in minutes').setRequired(true))
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   new SlashCommandBuilder()
     .setName('poll')
@@ -244,6 +270,7 @@ const commands = [
     .addStringOption(option => option.setName('question').setDescription('The question you want to ask').setRequired(true))
     .addStringOption(option => option.setName('option1').setDescription('First choice').setRequired(true))
     .addStringOption(option => option.setName('option2').setDescription('Second choice').setRequired(true))
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
 ].map(command => command.toJSON());
 
 client.once('ready', async () => {
@@ -254,10 +281,32 @@ client.once('ready', async () => {
   
   try {
     console.log('Started refreshing guild (/) commands.');
-    await rest.put(
+    const registeredCommands = await rest.put(
       Routes.applicationGuildCommands(client.user.id, GUILD_ID),
       { body: commands },
     );
+
+    // Explicitly lock down permissions per role in Discord so only the specified role can see/use them
+    const guild = client.guilds.cache.get(GUILD_ID);
+    if (guild) {
+      const permissionsBody = registeredCommands.map(cmd => ({
+        id: cmd.id,
+        permissions: [
+          {
+            id: TARGET_ROLE_ID,
+            type: 1, // 1 represents ROLE type in Discord permissions v2 API
+            permission: true
+          }
+        ]
+      }));
+
+      await rest.put(
+        Routes.guildApplicationCommandsPermissions(client.user.id, GUILD_ID),
+        { body: permissionsBody }
+      );
+      console.log('Successfully restricted guild slash commands to role ID:', TARGET_ROLE_ID);
+    }
+
     console.log('Successfully reloaded and updated guild (/) commands.');
   } catch (error) {
     console.error(error);
@@ -341,6 +390,14 @@ client.on('messageCreate', async message => {
 
 // Handle Slash Command & Button/Poll Interactions
 client.on('interactionCreate', async interaction => {
+  // Security Check: Enforce Role Restriction on all interactions
+  if (interaction.isGuildBased() && !interaction.member.roles.cache.has(TARGET_ROLE_ID)) {
+    if (interaction.isRepliable()) {
+      return interaction.reply({ content: '❌ You do not have the required role to use this bot.', ephemeral: true });
+    }
+    return;
+  }
+
   // Handle Button / Interactive Component Clicks
   if (interaction.isButton()) {
     const customId = interaction.customId;
@@ -1200,5 +1257,4 @@ client.on('interactionCreate', async interaction => {
   }
 });
 
-client.login(process.env.TOKEN);
 client.login(process.env.TOKEN || process.env.TOKEN2);
