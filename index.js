@@ -274,7 +274,7 @@ const commands = [
 ].map(command => command.toJSON());
 
 client.once('ready', async () => {
-  console.log(`Logged in as ${client.user.tag}![cite: 3]`);
+  console.log(`Logged in as ${client.user.tag}!`);
 
   const GUILD_ID = '1430150908490027090';
   const rest = new REST({ version: '10' }).setToken(process.env.TOKEN || process.env.TOKEN2);
@@ -420,7 +420,7 @@ client.on('interactionCreate', async interaction => {
         body: JSON.stringify({ username: interaction.user.tag, timestamp: Date.now() })
       });
 
-      return interaction.reply({ content: `✅ **Entry Confirmed!** You are officially entered to win!`, ephemeral: true });
+      return interaction.reply({ content: `✅ **Entry Confirmed!** You are officially entered to the Giveaway!`, ephemeral: true });
     }
 
     // B. Poll Voting Button Handler
@@ -1134,8 +1134,9 @@ client.on('interactionCreate', async interaction => {
 
       const embed = new EmbedBuilder()
         .setColor('#00ffcc')
-        .setTitle('🎉 EPIC GAME GIVEAWAY 🎉')
-        .setDescription(`Prize: **${prize}**\nWinners: **${winnerCount}**\nEnds: <t:${Math.floor(endTime / 1000)}:R>\n\nClick the button below to secure your entry!`)
+        .setTitle('GIVEAWAY By [💰] Puataun')
+        .setDescription(`Prize: **${prize}**\nWinners: **${winnerCount}**\nEnds: <t:${Math.floor(endTime / 1000)}:R>\n\nClick the button below to enter for the giveaway!`)
+        .setImage('https://gemini.google.com/7f7e9f06-465d-4a48-8cae-87c8c17702b2')
         .setFooter({ text: `Hosted by ${interaction.user.tag}` })
         .setTimestamp(endTime);
 
@@ -1163,6 +1164,7 @@ client.on('interactionCreate', async interaction => {
             .setColor('#ff007f')
             .setTitle('🎉 GIVEAWAY CONCLUDED 🎉')
             .setDescription(`Prize: **${prize}**\n\n👑 **Winner(s):**\n${winners.map(w => `• ${w}`).join('\n')}`)
+            .setImage('https://gemini.google.com/7f7e9f06-465d-4a48-8cae-87c8c17702b2')
             .setTimestamp();
 
           await msg.edit({ embeds: [endedEmbed], components: [] });
