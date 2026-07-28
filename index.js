@@ -1136,7 +1136,7 @@ client.on('interactionCreate', async interaction => {
         .setColor('#00ffcc')
         .setTitle('GIVEAWAY By [💰] Puataun')
         .setDescription(`Prize: **${prize}**\nWinners: **${winnerCount}**\nEnds: <t:${Math.floor(endTime / 1000)}:R>\n\nClick the button below to enter for the giveaway!`)
-        .setImage('https://gemini.google.com/7f7e9f06-465d-4a48-8cae-87c8c17702b2')
+        .setImage('https://gemini.google.com/77d8063f-9f78-4ae5-b437-6e4b1f254438')
         .setFooter({ text: `Hosted by ${interaction.user.tag}` })
         .setTimestamp(endTime);
 
@@ -1164,7 +1164,7 @@ client.on('interactionCreate', async interaction => {
             .setColor('#ff007f')
             .setTitle('🎉 GIVEAWAY CONCLUDED 🎉')
             .setDescription(`Prize: **${prize}**\n\n👑 **Winner(s):**\n${winners.map(w => `• ${w}`).join('\n')}`)
-            .setImage('https://gemini.google.com/7f7e9f06-465d-4a48-8cae-87c8c17702b2')
+            .setImage('https://gemini.google.com/77d8063f-9f78-4ae5-b437-6e4b1f254438')
             .setTimestamp();
 
           await msg.edit({ embeds: [endedEmbed], components: [] });
