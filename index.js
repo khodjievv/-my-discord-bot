@@ -249,7 +249,7 @@ const commands = [
 ].map(command => command.toJSON());
 
 client.once('ready', async () => {
-  console.log(`Logged in as ${client.user.tag}![cite: 3]`);
+  console.log(`Logged in as ${client.user.tag}!`);
 
   const GUILD_ID = '1430150908490027090';
   const rest = new REST({ version: '10' }).setToken(process.env.TOKEN || process.env.TOKEN2);
@@ -708,7 +708,8 @@ client.on('interactionCreate', async interaction => {
         .setColor('#3498db')
         .setTitle('❓ Support')
         .setDescription('Do you have any questions regarding the server or game?\nCreate a ticket here and our moderators will help you!\n\nPlease keep in mind that creating joke tickets is against the rules.')
-        .setFooter({ text: 'Official Ticket Tool Partner' });
+        .setImage('https://chatgpt.com/backend-api/estuary/content?id=file_00000000285c8246935b2ec07f2b9ada&ts=495901&p=fs&cid=1&sig=aa4e0be7854f5bea74475498afb4518c4e69a0ae780d5a7193b94727bc88b626&v=0')
+        .setFooter({ text: '[💰] Puataun’s Utilities' });
 
       const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
