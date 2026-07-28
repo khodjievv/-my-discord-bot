@@ -709,7 +709,7 @@ client.on('interactionCreate', async interaction => {
         .setTitle('❓ Support')
         .setDescription('Do you have any questions regarding the server or game?\nCreate a ticket here and our moderators will help you!\n\nPlease keep in mind that creating joke tickets is against the rules.')
         .setImage('https://chatgpt.com/backend-api/estuary/content?id=file_00000000285c8246935b2ec07f2b9ada&ts=495901&p=fs&cid=1&sig=aa4e0be7854f5bea74475498afb4518c4e69a0ae780d5a7193b94727bc88b626&v=0')
-        .setFooter({ text: '[💰] Puataun’s Utilities' });
+        .setFooter({ text: '[💰] Puataun’s Utilities', iconURL: 'https://chatgpt.com/backend-api/estuary/content?id=file_00000000285c8246935b2ec07f2b9ada&ts=495901&p=fs&cid=1&sig=aa4e0be7854f5bea74475498afb4518c4e69a0ae780d5a7193b94727bc88b626&v=0' });
 
       const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
