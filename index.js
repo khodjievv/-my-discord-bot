@@ -1,5 +1,5 @@
 const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, PermissionFlagsBits, ChannelType } = require('discord.js');
-const express = express();
+const express = require('express');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -139,8 +139,8 @@ client.on('interactionCreate', async interaction => {
     const embed = new EmbedBuilder()
       .setColor('#3498db')
       .setTitle('❓ Support')
-      .setDescription('Do you have any questions regarding the server or game?\nCreate a ticket here and our moderators will help you!\n\nPlease keep in main that creating joke tickets is against the rules.')
-      .setFooter({ text: "Khaby's Utilities" });
+      .setDescription('Do you have any questions regarding the server or game?\nCreate a ticket here and our moderators will help you!\n\nPlease keep in mind that creating joke tickets is against the rules.')
+      .setFooter({ text: 'Official Ticket Tool Partner' });
 
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
