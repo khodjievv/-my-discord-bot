@@ -718,8 +718,7 @@ client.on('interactionCreate', async interaction => {
                 .setEmoji('📥')
         );
 
-      // Using ephemeral: true so the command response doesn't show "[User] used /ticketpanel" publicly in chat
-      await interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
+      await interaction.reply({ embeds: [embed], components: [row] });
     }
 
     else if (commandName === 'say') {
