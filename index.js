@@ -1152,15 +1152,22 @@ client.on('interactionCreate', async interaction => {
 
       const enterButton = new ButtonBuilder()
         .setCustomId(`enter_gw_${giveawayId}`)
-        .setLabel('🎉 ENTER GIVEAWAY')
-        .setStyle(ButtonStyle.Success);
+        .setLabel('ENTER GIVEAWAY')
+        .setStyle(ButtonStyle.Success)
+        .setEmoji('🎉');
 
       const row = new ActionRowBuilder().addComponents(enterButton);
 
       const embed = new EmbedBuilder()
         .setColor('#00ffcc')
-        .setTitle('🎉 EPIC GAME GIVEAWAY 🎉')
-        .setDescription(`Prize: **${prize}**\nWinners: **${winnerCount}**\nEnds: <t:${Math.floor(endTime / 1000)}:R>\n\nClick the button below to secure your entry!`)
+        .setTitle('🎉 ENTER THE GIVEAWAY')
+        .setDescription(
+          `🎁 **Prize Pool:** \`${prize}\`\n` +
+          `👑 **Lucky Winners:** \`${winnerCount}\`\n` +
+          `⏳ **Time Remaining:** <t:${Math.floor(endTime / 1000)}:R>\n\n` +
+          `Click the button below to secure your entry!`
+        )
+        .setImage('https://media.discordapp.net/attachments/1458035083540955307/1531679356647379094/ChatGPT_Image_Jul_28_2026_05_42_46_PM.png?ex=6a6a170f&is=6a68c58f&hm=d6671bd00a0a3a9d41a5d02deba83b4375cff35ac6461189add325b8eae8d744&=&format=webp&quality=lossless&width=1218&height=672')
         .setFooter({ text: `Hosted by ${interaction.user.tag}` })
         .setTimestamp(endTime);
 
@@ -1187,7 +1194,7 @@ client.on('interactionCreate', async interaction => {
           const endedEmbed = new EmbedBuilder()
             .setColor('#ff007f')
             .setTitle('🎉 GIVEAWAY CONCLUDED 🎉')
-            .setDescription(`Prize: **${prize}**\n\n👑 **Winner(s):**\n${winners.map(w => `• ${w}`).join('\n')}`)
+            .setDescription(`🎁 **Prize Pool:** \`${prize}\`\n\n👑 **Lucky Winner(s):**\n${winners.map(w => `• ${w}`).join('\n')}`)
             .setTimestamp();
 
           await msg.edit({ embeds: [endedEmbed], components: [] });
